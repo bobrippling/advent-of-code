@@ -41,42 +41,78 @@
 //
 // What is the Manhattan distance from the central port to the closest intersection?
 
+// part 2
+// It turns out that this circuit is very timing-sensitive; you actually need to minimize the signal delay.
+//
+// To do this, calculate the number of steps each wire takes to reach each intersection; choose the intersection where the sum of both wires' steps is lowest. If a wire visits a position on the grid multiple times, use the steps value from the first time it visits that position when calculating the total value of a specific intersection.
+//
+// The number of steps a wire takes is the total number of grid squares the wire has entered to get to that location, including the intersection being considered. Again consider the example from above:
+//
+// ...........
+// .+-----+...
+// .|.....|...
+// .|..+--X-+.
+// .|..|..|.|.
+// .|.-X--+.|.
+// .|..|....|.
+// .|.......|.
+// .o-------+.
+// ...........
+//
+// In the above example, the intersection closest to the central port is reached after 8+5+5+2 = 20 steps by the first wire and 7+6+4+3 = 20 steps by the second wire for a total of 20+20 = 40 steps.
+//
+// However, the top-right intersection is better: the first wire takes only 8+5+2 = 15 and the second wire takes only 7+6+2 = 15, a total of 15+15 = 30 steps.
+//
+// Here are the best steps for the extra examples from above:
+//
+//     R75,D30,R83,U83,L12,D49,R71,U7,L72
+//     U62,R66,U55,R34,D71,R55,D58,R83 = 610 steps
+//     R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51
+//     U98,R91,D20,R16,D67,R40,U7,R15,U6,R7 = 410 steps
+//
+// What is the fewest combined steps the wires must take to reach an intersection?
+
 const fs = require("fs");
 
 const SPACE = ".";
 const ORIGIN = "o";
-const SIZE = 5000;
-let grid;
-
-const origin = { x: SIZE / 2, y: SIZE / 2 };
+let grid, gridmin, gridmax;
 
 const init = () => {
 	grid = {};
-	/*grid = [...Array(SIZE)]
-		.map(x => [...Array(SIZE)].map(_ => SPACE));*/
-
-	set(origin, ORIGIN);
+	gridmin = { x: 0, y: 0 };
+	gridmax = { x: 0, y: 0 };
+	set({ x: 0, y: 0 }, ORIGIN);
 };
 
 const set = ({x, y}, v) => {
+	if(x == 0 && y == 0 && grid[x] && grid[x][y])
+		throw "hi";
+
 	if(!grid[x]){
 		grid[x] = {};
 	}
 	grid[x][y] = v;
+
+	if(x < gridmin.x) gridmin.x = x;
+	if(x > gridmax.x) gridmax.x = x;
+	if(y < gridmin.y) gridmin.y = y;
+	if(y > gridmax.y) gridmax.y = y;
 };
 
 const get = ({x, y}) => {
-	if(grid[x]){
-		return grid[x][y];
-	}
-	return SPACE;
+	if(!grid[x])
+		return SPACE;
+	return grid[x][y] || SPACE;
 };
 
 const showGrid = () => {
 	let out = "";
-	for(let y = 0; y < SIZE; y++){
-		for(let x = 0; x < SIZE; x++)
+
+	for(let y = gridmin.y; y <= gridmax.y; y++){
+		for(let x = gridmin.x; x <= gridmax.x; x++){
 			out += get({ x, y });
+		}
 
 		out += "\n";
 	}
@@ -89,16 +125,17 @@ const die = str => {
 };
 
 const walk = (wire, mark, overlap) => {
-	const pos = { ...origin };
+	const pos = { x: 0, y: 0 };
+	let steps = 0;
+
 	for(const entry of wire){
 		const match = /([UDLR])(\d+)/.exec(entry);
 		if(!match)
 			die(`couldn't match against "${entry}"`);
 
 		let [, dir, count] = match;
-		let first = true;
 
-		for(; count; first = false, count--){
+		for(; count; count--){
 			switch(dir){
 				case 'U': pos.y -= 1; break;
 				case 'D': pos.y += 1; break;
@@ -106,11 +143,20 @@ const walk = (wire, mark, overlap) => {
 				case 'R': pos.x += 1; break;
 			}
 
+			steps++;
 			const at = get(pos);
-			if(overlap && at != SPACE)
-				overlap(pos, at);
+			if(overlap && at != SPACE){
+				const { mark: markAt, steps: stepsAt } = at;
 
-			set(pos, mark);
+				overlap(pos, markAt, steps + stepsAt);
+			}
+
+			set(pos, {
+				mark,
+				steps,
+				toString(){
+					return this.mark;
+				}});
 		}
 	}
 };
@@ -125,19 +171,21 @@ const closestDistance = (wires) => {
 	const crosses = [];
 
 	walk(wires[0], 'a');
+	//console.log(wires[0]);
 	//showGrid();
-	walk(wires[1], 'b', (pos, val) => {
-		if(val != 'a')
+	walk(wires[1], 'b', (pos, mark, steps) => {
+		if(mark != 'a')
 			return;
-		crosses.push({ ...pos });
+		crosses.push({ ...pos, steps });
 	});
+	//console.log(wires[1]);
 	//showGrid();
 
 	let mindist = Infinity;
 	let min;
 
 	for(const x of crosses){
-		const dist = manhat(x, origin);
+		const dist = x.steps;
 
 		/*
 		console.log("overlap @ ",
@@ -154,16 +202,19 @@ const closestDistance = (wires) => {
 		}
 	}
 
-	return { dist: mindist, point: min };
+	return { steps: mindist, point: min };
 };
 
-const expectDistance = (wires, expected) => {
+const expectDistance = (wires, expected, expectedSteps) => {
 	init();
 
-	const { dist, point } = closestDistance(wires);
+	const { dist, point, steps } = closestDistance(wires);
 
-	if(dist != expected){
-		console.error(`got ${dist}, expected ${expected}`);
+	//if(dist != expected){
+	//	console.error(`got ${dist}, expected ${expected}`);
+	//}
+	if(steps != expectedSteps){
+		console.error(`got ${steps} STEPS, expected ${expectedSteps}`);
 	}
 };
 
@@ -174,33 +225,37 @@ const eg0 = () => {
 	const wire1 = "R8,U5,L5,D3".split(",");
 	const wire2 = "U7,R6,D4,L4".split(",");
 
-	expectDistance([wire1, wire2], 6);
+	expectDistance([wire1, wire2], 6, 30);
 };
 
 const eg1 = () => {
 	const wire1 = "R75,D30,R83,U83,L12,D49,R71,U7,L72".split(",");
 	const wire2 = "U62,R66,U55,R34,D71,R55,D58,R83".split(",");
 
-	expectDistance([wire1, wire2], 159);
+	expectDistance([wire1, wire2], 159, 610);
 };
 
 const eg2 = () => {
 	const wire1 = "R98,U47,R26,D63,R33,U87,L62,D20,R33,U53,R51".split(",");
 	const wire2 = "U98,R91,D20,R16,D67,R40,U7,R15,U6,R7".split(",");
 
-	expectDistance([wire1, wire2], 135);
+	expectDistance([wire1, wire2], 135, 410);
 };
 
-//eg0();
-//eg1();
-//eg2();
+const main = () => {
+	init();
 
-init();
+	const wires = lines("./input")
+		.filter(x => x)
+		.map(s => s.split(","));
 
-const wires = lines("./input")
-	.filter(x => x)
-	.map(s => s.split(","));
+	const { steps, point } = closestDistance(wires);
 
-const { dist, point } = closestDistance(wires);
+	console.log(steps);
+};
 
-console.log(dist);
+eg0();
+eg1();
+eg2();
+
+main();
