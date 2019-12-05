@@ -65,27 +65,77 @@
 //
 // Find the input noun and verb that cause the program to produce the output 19690720. What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
 
+
+////////////////
+
+// Opcode 3 takes a single integer as input and saves it to the position given by its only parameter. For example, the instruction 3,50 would take an input value and store it at address 50.
+// Opcode 4 outputs the value of its only parameter. For example, the instruction 4,50 would output the value at address 50.
+
 use std::fs;
 
-type Word = u32;
+type Word = i64; // can be signed
 
 const OP_ADD: Word = 1; // *[3] = *[1] + *[2]
 const OP_MUL: Word = 2; // *[3] = *[1] + *[2]
-const OP_HALT: Word = 99;
+const OP_HALT: Word = 99; // no arg
+const OP_INPUT: Word = 3; // output
+const OP_OUTPUT: Word = 4; // input
+
+fn input() -> Word {
+    use std::io;
+    eprintln!("input");
+    let mut line = String::new();
+
+    loop {
+        match io::stdin().read_line(&mut line) {
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("error reading stdin: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let line = line.trim_end();
+
+        match line.parse::<Word>() {
+            Ok(i) => return i,
+            Err(_) => {
+                eprintln!("couldn't parse {}, try again", line);
+            }
+        }
+    }
+}
+
+fn output(w: Word) {
+    println!("{}", w);
+}
+
+fn decode_param(op: Word, iparam: u32) -> bool {
+    let mut paramcodes = op / 100;
+
+    for _ in 0 .. iparam {
+        paramcodes /= 10;
+    }
+
+    paramcodes % 10 == 0
+}
 
 fn interpret(bytes: &mut [Word]) {
     let mut i = 0;
 
     loop {
         let op = bytes[i];
+        let opmod = op % 100;
 
-        match op {
+        match opmod {
             OP_ADD => {
                 let (src1, src2, dest)
                     = (bytes[i + 1], bytes[i + 2], bytes[i + 3]);
 
-                bytes[dest as usize] = bytes[src1 as usize]
-                    .wrapping_add(bytes[src2 as usize]);
+                let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
+
+                bytes[dest as usize] = (if deref_1 { bytes[src1 as usize] } else { src1 })
+                    .wrapping_add(if deref_2 { bytes[src2 as usize] } else { src2 });
 
                 i += 4;
             },
@@ -94,10 +144,29 @@ fn interpret(bytes: &mut [Word]) {
                 let (src1, src2, dest)
                     = (bytes[i + 1], bytes[i + 2], bytes[i + 3]);
 
-                bytes[dest as usize] = bytes[src1 as usize]
-                    .wrapping_mul(bytes[src2 as usize]);
+                let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
+
+                bytes[dest as usize] = (if deref_1 { bytes[src1 as usize] } else { src1 })
+                    .wrapping_mul(if deref_2 { bytes[src2 as usize] } else { src2 });
 
                 i += 4;
+            },
+
+            OP_INPUT => {
+                let dest = bytes[i + 1];
+
+                bytes[dest as usize] = input();
+
+                i += 2;
+            },
+
+            OP_OUTPUT => {
+                let src = bytes[i + 1];
+                let deref = decode_param(op, 0);
+
+                output(if deref { bytes[src as usize] } else { src });
+
+                i += 2;
             },
 
             OP_HALT => {
@@ -105,6 +174,7 @@ fn interpret(bytes: &mut [Word]) {
             }
 
             _ => {
+                eprintln!("unknown isn {}", opmod);
                 panic!();
             },
         }
@@ -173,14 +243,17 @@ fn part2(bytes_slice: &[Word]) {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let s = fs::read_to_string("./input")?;
-    let bytes = s
+    let mut bytes = s
         .trim_end()
         .split(",")
         .map(str::parse)
         .collect::<Result<Vec<Word>, _>>()?;
 
     //part1(&bytes);
-    part2(&bytes);
+    //part2(&bytes);
+
+    interpret(&mut bytes);
+    show_bytes(&bytes);
 
     Ok(())
 }
@@ -224,4 +297,18 @@ mod tests {
         assert_eq!(bytes, [30, 1, 1, 4, 2, 5, 6, 0, 99]);
     }
 
+    #[test]
+    fn test_eg6() {
+        let mut bytes = [1101,100,-1,4,0];
+        //is a valid program (find 100 + -1, store the result in position 4)
+        interpret(&mut bytes);
+        assert_eq!(bytes, [1101,100,-1,4,100 + -1]);
+    }
+
+    #[test]
+    fn test_eg7() {
+        let mut bytes = [1002,4,3,4,33]; // exit after mul
+        interpret(&mut bytes);
+        assert_eq!(bytes, [1002,4,3,4,99]);
+    }
 }
