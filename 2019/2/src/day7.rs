@@ -1,18 +1,23 @@
 use std::fs;
 
 mod lib;
-use lib::{IntCodeState, interpret_async, interpret, Word};
+use lib::{IntCodeMachine, State, Word};
 
+#[cfg(test)]
+use lib::interpret_oneshot;
+
+#[cfg(test)]
 type Phase = Vec<Word>;
 
+#[cfg(test)]
 fn run_phase(phases: &Vec<Word>, bytes: &[Word]) -> Word {
     let mut last_i = 0;
 
     for phase in 0..=4 {
-        let mut input = vec![phases[phase], last_i];
         let mut bytes = Vec::from(bytes);
+        let mut input = vec![phases[phase], last_i];
 
-        let output = interpret(&mut bytes, &mut input);
+        let output = interpret_oneshot(&mut bytes, &mut input);
         assert_eq!(input.len(), 0);
         assert_eq!(output.len(), 1);
         let old = last_i;
@@ -24,6 +29,7 @@ fn run_phase(phases: &Vec<Word>, bytes: &[Word]) -> Word {
     last_i
 }
 
+#[cfg(test)]
 fn find_max_phase(bytes: &[Word]) -> (Word, Phase) {
     let mut max = 0;
     let mut max_phase = Vec::new();
@@ -64,78 +70,40 @@ fn find_max_phase(bytes: &[Word]) -> (Word, Phase) {
 }
 
 fn run_phase_feedback(phases: &Vec<Word>, bytes: &[Word]) -> Word {
-    #[derive(PartialEq)]
-    enum State {
-        Init,
-        WantInput,
-        Halted,
-    }
     struct Amplifier {
-        code: Vec<Word>,
-        state: State,
+        machine: IntCodeMachine,
+
         input_queue: Vec<Word>,
         output_queue: Vec<Word>,
-        ip: usize,
     };
 
     impl Amplifier {
-        fn new(phase: Word, code: &[Word]) -> Self {
+        fn new(phase: Word, mem: &[Word]) -> Self {
             Self {
-                code: Vec::from(code),
-                state: State::Init,
+                machine: IntCodeMachine::new(mem, false),
+
                 input_queue: vec![phase],
                 output_queue: vec![],
-                ip: 0,
             }
         }
 
         fn run(&mut self) {
-            match self.state {
-                State::Init => {
-                    let ics = IntCodeState::Running {
-                        mem: &mut self.code,
-                        output: Default::default(),
-                        ip: 0,
-                    };
-                    let ics = interpret_async(ics, &mut self.input_queue);
-                    match ics {
-                        IntCodeState::Halted(mut output) => {
-                            self.state = State::Halted;
-                            self.output_queue.append(&mut output);
-                        },
-                        IntCodeState::Running {
-                            mem: _, mut output, ip,
-                        } => {
-                            self.state = State::WantInput;
-                            self.ip = ip;
-                            self.output_queue.append(&mut output);
-                        }
-                    };
-                },
-                State::WantInput => {
-                    let ics = IntCodeState::Running {
-                        mem: &mut self.code,
-                        output: Default::default(),
-                        ip: self.ip,
-                    };
-                    let ics = interpret_async(ics, &mut self.input_queue);
-                    match ics {
-                        IntCodeState::Halted(mut output) => {
-                            self.state = State::Halted;
-                            self.output_queue.append(&mut output);
-                        },
-                        IntCodeState::Running {
-                            mem: _, mut output, ip,
-                        } => {
-                            self.state = State::WantInput;
-                            self.ip = ip;
-                            self.output_queue.append(&mut output);
-                        }
-                    };
+            match self.machine.state() {
+                State::Running => {
+                    let mut output = self.machine.interpret_async(&mut self.input_queue);
+
+                    self.output_queue.append(&mut output);
                 },
                 State::Halted => {
                 },
             };
+        }
+
+        fn running(&self) -> bool {
+            match self.machine.state() {
+                State::Running => true,
+                State::Halted => false,
+            }
         }
     }
 
@@ -162,7 +130,7 @@ fn run_phase_feedback(phases: &Vec<Word>, bytes: &[Word]) -> Word {
             }
 
             amp.run();
-            if amp.state != State::Halted {
+            if amp.running() {
                 foundrunning = true;
             }
         }
@@ -236,7 +204,7 @@ mod tests {
     fn test_run_phase() {
         let mut bytes = [3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0];
 
-        let output = interpret(&mut bytes, &mut vec![4, 0]);
+        let output = interpret_oneshot(&mut bytes, &mut vec![4, 0]);
 
         assert_eq!(output.len(), 1);
         assert_eq!(output[0], 4);
