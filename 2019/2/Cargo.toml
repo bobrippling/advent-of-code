@@ -5,3 +5,11 @@ authors = ["Rob Pilling <robpilling@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+
+[lib]
+name = "intcode"
+path = "src/lib.rs"
+
+[[bin]]
+name = "day7"
+path = "src/day7.rs"
