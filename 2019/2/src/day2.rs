@@ -1,3 +1,5 @@
+use std::fs;
+
 fn show_bytes(bytes: &[Word]) {
     for b in bytes {
         print!("{},", b);
