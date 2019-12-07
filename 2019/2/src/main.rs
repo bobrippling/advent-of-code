@@ -1,118 +1,3 @@
-// You notify the Elves that the computer's magic smoke seems to have escaped. "That computer ran Intcode programs like the gravity assist program it was working on; surely there are enough spare parts up there to build a new Intcode computer!"
-//
-// An Intcode program is a list of integers separated by commas (like 1,0,0,3,99). To run one, start by looking at the first integer (called position 0). Here, you will find an opcode - either 1, 2, or 99. The opcode indicates what to do; for example, 99 means that the program is finished and should immediately halt. Encountering an unknown opcode means something went wrong.
-//
-// Opcode 1 adds together numbers read from two positions and stores the result in a third position. The three integers immediately after the opcode tell you these three positions - the first two indicate the positions from which you should read the input values, and the third indicates the position at which the output should be stored.
-//
-// For example, if your Intcode computer encounters 1,10,20,30, it should read the values at positions 10 and 20, add those values, and then overwrite the value at position 30 with their sum.
-//
-// Opcode 2 works exactly like opcode 1, except it multiplies the two inputs instead of adding them. Again, the three integers after the opcode indicate where the inputs and outputs are, not their values.
-//
-// Once you're done processing an opcode, move to the next one by stepping forward 4 positions.
-//
-// For example, suppose you have the following program:
-//
-// 1,9,10,3,2,3,11,0,99,30,40,50
-//
-// For the purposes of illustration, here is the same program split into multiple lines:
-//
-// 1,9,10,3,
-// 2,3,11,0,
-// 99,
-// 30,40,50
-//
-// The first four integers, 1,9,10,3, are at positions 0, 1, 2, and 3. Together, they represent the first opcode (1, addition), the positions of the two inputs (9 and 10), and the position of the output (3). To handle this opcode, you first need to get the values at the input positions: position 9 contains 30, and position 10 contains 40. Add these numbers together to get 70. Then, store this value at the output position; here, the output position (3) is at position 3, so it overwrites itself. Afterward, the program looks like this:
-//
-// 1,9,10,70,
-// 2,3,11,0,
-// 99,
-// 30,40,50
-//
-// Step forward 4 positions to reach the next opcode, 2. This opcode works just like the previous, but it multiplies instead of adding. The inputs are at positions 3 and 11; these positions contain 70 and 50 respectively. Multiplying these produces 3500; this is stored at position 0:
-//
-// 3500,9,10,70,
-// 2,3,11,0,
-// 99,
-// 30,40,50
-//
-// Stepping forward 4 more positions arrives at opcode 99, halting the program.
-//
-// Here are the initial and final states of a few more small programs:
-//
-//     1,0,0,0,99 becomes 2,0,0,0,99 (1 + 1 = 2).
-//     2,3,0,3,99 becomes 2,3,0,6,99 (3 * 2 = 6).
-//     2,4,4,5,99,0 becomes 2,4,4,5,99,9801 (99 * 99 = 9801).
-//     1,1,1,4,99,5,6,0,99 becomes 30,1,1,4,2,5,6,0,99.
-//
-// Once you have a working computer, the first step is to restore the gravity assist program (your puzzle input) to the "1202 program alarm" state it had just before the last computer caught fire. To do this, before running the program, replace position 1 with the value 12 and replace position 2 with the value 2. What value is left at position 0 after the program halts?
-
-// part 2
-// "Good, the new computer seems to be working correctly! Keep it nearby during this mission - you'll probably use it again. Real Intcode computers support many more features than your new one, but we'll let you know what they are as you need them."
-//
-// "However, your current priority should be to complete your gravity assist around the Moon. For this mission to succeed, we should settle on some terminology for the parts you've already built."
-//
-// Intcode programs are given as a list of integers; these values are used as the initial state for the computer's memory. When you run an Intcode program, make sure to start by initializing memory to the program's values. A position in memory is called an address (for example, the first value in memory is at "address 0").
-//
-// Opcodes (like 1, 2, or 99) mark the beginning of an instruction. The values used immediately after an opcode, if any, are called the instruction's parameters. For example, in the instruction 1,2,3,4, 1 is the opcode; 2, 3, and 4 are the parameters. The instruction 99 contains only an opcode and has no parameters.
-//
-// The address of the current instruction is called the instruction pointer; it starts at 0. After an instruction finishes, the instruction pointer increases by the number of values in the instruction; until you add more instructions to the computer, this is always 4 (1 opcode + 3 parameters) for the add and multiply instructions. (The halt instruction would increase the instruction pointer by 1, but it halts the program instead.)
-//
-// "With terminology out of the way, we're ready to proceed. To complete the gravity assist, you need to determine what pair of inputs produces the output 19690720."
-//
-// The inputs should still be provided to the program by replacing the values at addresses 1 and 2, just like before. In this program, the value placed in address 1 is called the noun, and the value placed in address 2 is called the verb. Each of the two input values will be between 0 and 99, inclusive.
-//
-// Once the program has halted, its output is available at address 0, also just like before. Each time you try a pair of inputs, make sure you first reset the computer's memory to the values in the program (your puzzle input) - in other words, don't reuse memory from a previous attempt.
-//
-// Find the input noun and verb that cause the program to produce the output 19690720. What is 100 * noun + verb? (For example, if noun=12 and verb=2, the answer would be 1202.)
-
-
-////////////////
-
-// Opcode 3 takes a single integer as input and saves it to the position given by its only parameter. For example, the instruction 3,50 would take an input value and store it at address 50.
-// Opcode 4 outputs the value of its only parameter. For example, the instruction 4,50 would output the value at address 50.
-//
-//
-//
-// The air conditioner comes online! Its cold air feels good for a while, but then the TEST alarms start to go off. Since the air conditioner can't vent its heat anywhere but back into the spacecraft, it's actually making the air inside the ship warmer.
-
-// Instead, you'll need to use the TEST to extend the thermal radiators. Fortunately, the diagnostic program (your puzzle input) is already equipped for this. Unfortunately, your Intcode computer is not.
-
-// Your computer is only missing a few opcodes:
-
-//     Opcode 5 is jump-if-true: if the first parameter is non-zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
-//     Opcode 6 is jump-if-false: if the first parameter is zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
-//     Opcode 7 is less than: if the first parameter is less than the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
-//     Opcode 8 is equals: if the first parameter is equal to the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
-
-// Like all instructions, these instructions need to support parameter modes as described above.
-
-// Normally, after an instruction is finished, the instruction pointer increases by the number of values in that instruction. However, if the instruction modifies the instruction pointer, that value is used and the instruction pointer is not automatically increased.
-
-// For example, here are several programs that take one input, compare it to the value 8, and then produce one output:
-
-//     3,9,8,9,10,9,4,9,99,-1,8 - Using position mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
-//     3,9,7,9,10,9,4,9,99,-1,8 - Using position mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
-//     3,3,1108,-1,8,3,4,3,99 - Using immediate mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
-//     3,3,1107,-1,8,3,4,3,99 - Using immediate mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
-
-// Here are some jump tests that take an input, then output 0 if the input was zero or 1 if the input was non-zero:
-
-//     3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9 (using position mode)
-//     3,3,1105,-1,9,1101,0,0,12,4,12,99,1 (using immediate mode)
-
-// Here's a larger example:
-
-// 3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,
-// 1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,
-// 999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99
-
-// The above example program uses an input instruction to ask for a single number. The program will then output 999 if the input value is below 8, output 1000 if the input value is equal to 8, or output 1001 if the input value is greater than 8.
-
-// This time, when the TEST diagnostic program runs its input instruction to get the ID of the system to test, provide it 5, the ID for the ship's thermal radiator controller. This diagnostic test suite only outputs one number, the diagnostic code.
-
-// What is the diagnostic code for system ID 5?
-
-
 use std::fs;
 
 type Word = i64; // can be signed
@@ -122,8 +7,13 @@ const OP_MUL: Word = 2; // *[3] = *[1] + *[2]
 const OP_HALT: Word = 99; // no arg
 const OP_INPUT: Word = 3; // output
 const OP_OUTPUT: Word = 4; // input
+const OP_JNZ: Word = 5; // input1, input2
+const OP_JZ: Word = 6; // input1, input2
+const OP_LT: Word = 7; // src,src,dest
+const OP_EQ: Word = 8; // src,src,dest
 
-fn input() -> Word {
+fn input(a: &mut Vec<Word>) -> Word {
+    /*
     use std::io;
     eprintln!("input");
     let mut line = String::new();
@@ -146,11 +36,19 @@ fn input() -> Word {
             }
         }
     }
+    */
+    a.remove(0)/*
+    match a.remove(0) {
+        Some(i) => i,
+        None => panic!("no input")
+    }*/
 }
 
+/*
 fn output(w: Word) {
     println!("{}", w);
 }
+*/
 
 fn decode_param(op: Word, iparam: u32) -> bool {
     let mut paramcodes = op / 100;
@@ -162,8 +60,23 @@ fn decode_param(op: Word, iparam: u32) -> bool {
     paramcodes % 10 == 0
 }
 
-fn interpret(bytes: &mut [Word]) {
-    let mut i = 0;
+enum IntCodeState<'a> {
+    Halted(Vec<Word>),
+    Running {
+        mem: &'a mut [Word],
+        output: Vec<Word>,
+        ip: usize,
+    },
+}
+
+fn interpret_async<'a>(
+    state: IntCodeState<'a>,
+    inputs: &mut Vec<Word>
+) -> IntCodeState<'a> {
+    let ( bytes, mut output, mut i ) = match state {
+        IntCodeState::Running { mem, output, ip } => (mem, output, ip),
+        _ => panic!(),
+    };
 
     loop {
         let op = bytes[i];
@@ -176,8 +89,12 @@ fn interpret(bytes: &mut [Word]) {
 
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
 
-                bytes[dest as usize] = (if deref_1 { bytes[src1 as usize] } else { src1 })
-                    .wrapping_add(if deref_2 { bytes[src2 as usize] } else { src2 });
+                let i1 = if deref_1 { bytes[src1 as usize] } else { src1 };
+                let i2 = if deref_2 { bytes[src2 as usize] } else { src2 };
+
+                bytes[dest as usize] = (i1) .wrapping_add(i2);
+
+                println!("{} + {} --> [{}]", i1, i2, dest as usize);
 
                 i += 4;
             },
@@ -188,8 +105,12 @@ fn interpret(bytes: &mut [Word]) {
 
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
 
-                bytes[dest as usize] = (if deref_1 { bytes[src1 as usize] } else { src1 })
-                    .wrapping_mul(if deref_2 { bytes[src2 as usize] } else { src2 });
+                let i1 = if deref_1 { bytes[src1 as usize] } else { src1 };
+                let i2 = if deref_2 { bytes[src2 as usize] } else { src2 };
+
+                bytes[dest as usize] = (i1) * (i2);
+
+                println!("{} * {} --> [{}] (= {})", i1, i2, dest as usize, bytes[dest as usize]);
 
                 i += 4;
             },
@@ -197,7 +118,19 @@ fn interpret(bytes: &mut [Word]) {
             OP_INPUT => {
                 let dest = bytes[i + 1];
 
-                bytes[dest as usize] = input();
+                let inp = if inputs.len() > 0 {
+                    input(inputs)
+                } else {
+                    return IntCodeState::Running {
+                        mem: bytes,
+                        output,
+                        ip: i,
+                    };
+                };
+
+                bytes[dest as usize] = inp;
+
+                println!("input {} --> [{}]", bytes[dest as usize], dest);
 
                 i += 2;
             },
@@ -205,13 +138,17 @@ fn interpret(bytes: &mut [Word]) {
             OP_OUTPUT => {
                 let src = bytes[i + 1];
                 let deref = decode_param(op, 0);
+                let o = if deref { bytes[src as usize] } else { src };
 
-                output(if deref { bytes[src as usize] } else { src });
+                println!("output {}", o);
+
+                //output(o);
+                output.push(o);
 
                 i += 2;
             },
 
-            5 => {
+            OP_JNZ => {
                 let (src1, src2) = (bytes[i + 1], bytes[i + 2]);
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
                 let (src1_read, src2_read) = (
@@ -219,6 +156,7 @@ fn interpret(bytes: &mut [Word]) {
                     if deref_2 { bytes[src2 as usize] } else { src2 }
                 );
 
+                println!("jnz {} --> {}", src1_read, src2_read);
                 if src1_read != 0 {
                     i = src2_read as usize;
                 } else {
@@ -226,7 +164,7 @@ fn interpret(bytes: &mut [Word]) {
                 }
             },
 
-            6 => {
+            OP_JZ => {
                 let (src1, src2) = (bytes[i + 1 as usize], bytes[i + 2 as usize]);
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
                 let (src1_read, src2_read) = (
@@ -234,6 +172,7 @@ fn interpret(bytes: &mut [Word]) {
                     if deref_2 { bytes[src2 as usize] } else { src2 }
                 );
 
+                println!("jz {} --> {}", src1_read, src2_read);
                 if src1_read == 0 {
                     i = src2_read as usize;
                 } else {
@@ -241,7 +180,7 @@ fn interpret(bytes: &mut [Word]) {
                 }
             },
 
-            7 => {
+            OP_LT => {
                 let (src1, src2, dest) = (bytes[i + 1 as usize], bytes[i + 2 as usize], bytes[i + 3 as usize]);
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
                 let (src1_read, src2_read) = (
@@ -249,12 +188,13 @@ fn interpret(bytes: &mut [Word]) {
                     if deref_2 { bytes[src2 as usize] } else { src2 }
                 );
 
+                println!("{} < {} --> [{}]", src1_read, src2_read, dest);
                 bytes[dest as usize] = if src1_read < src2_read { 1 } else { 0 };
 
                 i += 4;
             },
 
-            8 => {
+            OP_EQ => {
                 let (src1, src2, dest) = (bytes[i + 1 as usize], bytes[i + 2 as usize], bytes[i + 3 as usize]);
                 let (deref_1, deref_2) = (decode_param(op, 0), decode_param(op, 1));
                 let (src1_read, src2_read) = (
@@ -262,13 +202,14 @@ fn interpret(bytes: &mut [Word]) {
                     if deref_2 { bytes[src2 as usize] } else { src2 }
                 );
 
+                println!("{} == {} --> [{}]", src1_read, src2_read, dest);
                 bytes[dest as usize] = if src1_read == src2_read { 1 } else { 0 };
 
                 i += 4;
             },
 
             OP_HALT => {
-                break;
+                return IntCodeState::Halted(output);
             }
 
             _ => {
@@ -276,6 +217,22 @@ fn interpret(bytes: &mut [Word]) {
                 panic!();
             },
         }
+    }
+}
+
+fn interpret(
+    bytes: &mut [Word],
+    inputs: &mut Vec<Word>
+) -> Vec<Word> {
+    let state = IntCodeState::Running {
+        mem: bytes,
+        ip: 0,
+        output: Default::default(),
+    };
+    let out = interpret_async(state, inputs);
+    match out {
+        IntCodeState::Halted(output) => output,
+        _ => panic!(),
     }
 }
 
@@ -298,7 +255,7 @@ fn part1(bytes_slice: &[Word]) {
     println!("input");
     show_bytes(&bytes);
 
-    interpret(&mut bytes);
+    interpret(&mut bytes, &mut Default::default());
 
     println!("output");
     show_bytes(&bytes);
@@ -318,7 +275,7 @@ fn part2(bytes_slice: &[Word]) {
                 bytes[1] = noun;
                 bytes[2] = verb;
 
-                interpret(&mut bytes);
+                interpret(&mut bytes, &mut Default::default());
 
                 let output = bytes[0];
 
@@ -339,9 +296,220 @@ fn part2(bytes_slice: &[Word]) {
     };
 }
 
+fn run_phase(phases: &Vec<Word>, bytes: &[Word]) -> Word {
+    let mut last_i = 0;
+
+    for phase in 0..=4 {
+        let mut input = vec![phases[phase], last_i];
+        let mut bytes = Vec::from(bytes);
+
+        let output = interpret(&mut bytes, &mut input);
+        assert_eq!(input.len(), 0);
+        assert_eq!(output.len(), 1);
+        let old = last_i;
+        last_i = output[0];
+        println!("  phase {:?}, input {} output {}",
+                 phases[phase], old, last_i);
+    }
+
+    last_i
+}
+
+type Phase = Vec<Word>;
+
+fn find_max_phase(bytes: &[Word]) -> (Word, Phase) {
+    let mut max = 0;
+    let mut max_phase = Vec::new();
+
+    for a in 0 ..= 4 {
+        for b in 0 ..= 4 {
+            for c in 0 ..= 4 {
+                for d in 0 ..= 4 {
+                    for e in 0 ..= 4 {
+                        if a == b || a == c || a == d || a == e {
+                            continue;
+                        }
+                        if b == c || b == d || b == e {
+                            continue;
+                        }
+                        if c == d || c == e {
+                            continue;
+                        }
+                        if d == e {
+                            continue;
+                        }
+
+                        let phase = vec![a, b, c, d, e];
+                        println!("phase: {:?}", phase);
+                        let m = run_phase(&phase, bytes);
+                        println!("  max: {}", m);
+                        if m >= max {
+                            max = m;
+                            max_phase = phase;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (max, max_phase)
+}
+
+fn run_phase_feedback(phases: &Vec<Word>, bytes: &[Word]) -> Word {
+    #[derive(PartialEq)]
+    enum State {
+        Init,
+        WantInput,
+        Halted,
+    }
+    struct Amplifier {
+        code: Vec<Word>,
+        state: State,
+        input_queue: Vec<Word>,
+        output_queue: Vec<Word>,
+        ip: usize,
+    };
+
+    impl Amplifier {
+        fn new(phase: Word, code: &[Word]) -> Self {
+            Self {
+                code: Vec::from(code),
+                state: State::Init,
+                input_queue: vec![phase],
+                output_queue: vec![],
+                ip: 0,
+            }
+        }
+
+        fn run(&mut self) {
+            match self.state {
+                State::Init => {
+                    let ics = IntCodeState::Running {
+                        mem: &mut self.code,
+                        output: Default::default(),
+                        ip: 0,
+                    };
+                    let ics = interpret_async(ics, &mut self.input_queue);
+                    match ics {
+                        IntCodeState::Halted(mut output) => {
+                            self.state = State::Halted;
+                            self.output_queue.append(&mut output);
+                        },
+                        IntCodeState::Running {
+                            mem: _, mut output, ip,
+                        } => {
+                            self.state = State::WantInput;
+                            self.ip = ip;
+                            self.output_queue.append(&mut output);
+                        }
+                    };
+                },
+                State::WantInput => {
+                    let ics = IntCodeState::Running {
+                        mem: &mut self.code,
+                        output: Default::default(),
+                        ip: self.ip,
+                    };
+                    let ics = interpret_async(ics, &mut self.input_queue);
+                    match ics {
+                        IntCodeState::Halted(mut output) => {
+                            self.state = State::Halted;
+                            self.output_queue.append(&mut output);
+                        },
+                        IntCodeState::Running {
+                            mem: _, mut output, ip,
+                        } => {
+                            self.state = State::WantInput;
+                            self.ip = ip;
+                            self.output_queue.append(&mut output);
+                        }
+                    };
+                },
+                State::Halted => {
+                },
+            };
+        }
+    }
+
+    let mut amplifiers = [
+        Amplifier::new(phases[0], From::from(bytes)),
+        Amplifier::new(phases[1], From::from(bytes)),
+        Amplifier::new(phases[2], From::from(bytes)),
+        Amplifier::new(phases[3], From::from(bytes)),
+        Amplifier::new(phases[4], From::from(bytes)),
+    ];
+
+    amplifiers[0].input_queue.push(0);
+
+    let mut output_for_next = Vec::new();
+    loop {
+        let mut foundrunning = false;
+
+        for amp in amplifiers.iter_mut() {
+            if output_for_next.len() > 0 {
+                amp.input_queue.append(&mut output_for_next);
+            }
+            if amp.output_queue.len() > 0 {
+                output_for_next.append(&mut amp.output_queue);
+            }
+
+            amp.run();
+            if amp.state != State::Halted {
+                foundrunning = true;
+            }
+        }
+
+        if !foundrunning {
+            break;
+        }
+    }
+
+    amplifiers[amplifiers.len()-1].output_queue[0]
+}
+
+fn find_max_phase_feedback(bytes: &[Word]) -> (Word, Vec<Word>) {
+    let mut max = 0;
+    let mut max_phase = Vec::new();
+
+    for a in 5 ..= 9 {
+        for b in 5 ..= 9 {
+            for c in 5 ..= 9 {
+                for d in 5 ..= 9 {
+                    for e in 5 ..= 9 {
+                        if a == b || a == c || a == d || a == e {
+                            continue;
+                        }
+                        if b == c || b == d || b == e {
+                            continue;
+                        }
+                        if c == d || c == e {
+                            continue;
+                        }
+                        if d == e {
+                            continue;
+                        }
+
+                        let phase = vec![a, b, c, d, e];
+                        println!("phase: {:?}", phase);
+                        let m = run_phase_feedback(&phase, bytes);
+                        println!("  max: {}", m);
+                        if m >= max {
+                            max = m;
+                            max_phase = phase;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (max, max_phase)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let s = fs::read_to_string("./input")?;
-    let mut bytes = s
+    let bytes = s
         .trim_end()
         .split(",")
         .map(str::parse)
@@ -350,8 +518,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //part1(&bytes);
     //part2(&bytes);
 
-    interpret(&mut bytes);
-    show_bytes(&bytes);
+    //interpret(&mut bytes, &mut Default::default());
+    //show_bytes(&bytes);
+
+    //let (max, phase) = find_max_phase(&bytes);
+    //println!("max={} phasse={:?}", max, phase);
+
+    let (max, phase) = find_max_phase_feedback(&bytes);
+    println!("max={} phasse={:?}", max, phase);
 
     Ok(())
 }
@@ -361,37 +535,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_decode_param() {
+        assert_eq!(decode_param(1002, 0), true);
+        assert_eq!(decode_param(1002, 1), false);
+    }
+
+    #[test]
     fn test_eg1() {
         let mut bytes = [1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]);
     }
 
     #[test]
     fn test_eg2() {
         let mut bytes = [1, 0, 0, 0, 99];
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 0, 0, 0, 99]);
     }
 
     #[test]
     fn test_eg3() {
         let mut bytes = [2, 3, 0, 3, 99];
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 3, 0, 6, 99]);
     }
 
     #[test]
     fn test_eg4() {
         let mut bytes = [2, 4, 4, 5, 99, 0];
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 4, 4, 5, 99, 9801]);
     }
 
     #[test]
     fn test_eg5() {
         let mut bytes = [1, 1, 1, 4, 99, 5, 6, 0, 99];
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [30, 1, 1, 4, 2, 5, 6, 0, 99]);
     }
 
@@ -399,14 +579,14 @@ mod tests {
     fn test_eg6() {
         let mut bytes = [1101,100,-1,4,0];
         //is a valid program (find 100 + -1, store the result in position 4)
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [1101,100,-1,4,100 + -1]);
     }
 
     #[test]
     fn test_eg7() {
         let mut bytes = [1002,4,3,4,33]; // exit after mul
-        interpret(&mut bytes);
+        interpret(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [1002,4,3,4,99]);
     }
 
@@ -419,4 +599,77 @@ mod tests {
 //     3,9,7,9,10,9,4,9,99,-1,8 - Using position mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
 //     3,3,1108,-1,8,3,4,3,99   - Using immediate mode, consider whether the input is equal to 8; output 1 (if it is) or 0 (if it is not).
 //     3,3,1107,-1,8,3,4,3,99   - Using immediate mode, consider whether the input is less than 8; output 1 (if it is) or 0 (if it is not).
+
+    #[test]
+    fn test_run_phase() {
+        let mut bytes = [3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0];
+
+        let output = interpret(
+            &mut bytes,
+            &mut vec![4, 0]
+        );
+
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0], 4);
+    }
+
+    #[test]
+        fn test_eg9() {
+            let expected_max = 43210;
+            let expected_phase = [4,3,2,1,0];
+            let bytes = [3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0];
+
+            let (max, phase) = find_max_phase(&bytes);
+            assert_eq!(phase, expected_phase);
+            assert_eq!(max, expected_max);
+        }
+
+     #[test]
+    fn test_eg10() {
+        let expected_max = 54321;
+        let expected_phase = [0,1,2,3,4];
+        let mut bytes = [3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0];
+
+            let (max, phase) = find_max_phase(&mut bytes);
+            assert_eq!(max, expected_max);
+            assert_eq!(phase, expected_phase);
+    }
+
+     #[test]
+    fn test_eg11() {
+        let expected_max = 65210;
+        let expected_phase = [1,0,4,3,2];
+        let mut bytes = [3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0];
+
+            let (max, phase) = find_max_phase(&mut bytes);
+            assert_eq!(max, expected_max);
+            assert_eq!(phase, expected_phase);
+    }
+
+    // -----
+
+    #[test]
+    fn test_eg12() {
+        let expected_max =139629729;
+        let expected_phase = [9,8,7,6,5];
+        let bytes = [3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26, 27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5];
+
+        let (max, phase) = find_max_phase_feedback(&bytes);
+
+        assert_eq!(max, expected_max);
+        assert_eq!(phase, expected_phase);
+    }
+
+    #[test]
+    fn test_eg13() {
+        let expected_max =18216;
+        let expected_phase = [9,7,8,5,6];
+        let bytes = [ 3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10 ];
+
+        let (max, phase) = find_max_phase_feedback(&bytes);
+
+        assert_eq!(max, expected_max);
+        assert_eq!(phase, expected_phase);
+    }
+
 }
