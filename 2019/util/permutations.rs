@@ -24,10 +24,10 @@ impl<'s, T> Permutations<'s, T> {
     fn current_from_iters(&mut self) -> Vec<&'s T> {
         let n = self.src.len();
 
-        let mut current = vec![&self.src[0]; n];
+        let mut current = Vec::with_capacity(n);
 
-        for (idx, i) in self.iters.iter().zip(0..) {
-            current[*idx] = &self.src[i];
+        for &i in self.iters.iter() {
+            current.push(&self.src[i]);
         }
         current
     }
@@ -145,8 +145,8 @@ mod tests {
         assert_eq!(iter.next(), Some(vec![&1, &2, &3]));
         assert_eq!(iter.next(), Some(vec![&1, &3, &2]));
         assert_eq!(iter.next(), Some(vec![&2, &1, &3]));
-        assert_eq!(iter.next(), Some(vec![&3, &1, &2]));
         assert_eq!(iter.next(), Some(vec![&2, &3, &1]));
+        assert_eq!(iter.next(), Some(vec![&3, &1, &2]));
         assert_eq!(iter.next(), Some(vec![&3, &2, &1]));
         assert_eq!(iter.next(), None);
     }
@@ -159,26 +159,26 @@ mod tests {
         assert_eq!(iter.next(), Some(vec![&"a", &"b", &"c", &"d"]));
         assert_eq!(iter.next(), Some(vec![&"a", &"b", &"d", &"c"]));
         assert_eq!(iter.next(), Some(vec![&"a", &"c", &"b", &"d"]));
-        assert_eq!(iter.next(), Some(vec![&"a", &"d", &"b", &"c"]));
         assert_eq!(iter.next(), Some(vec![&"a", &"c", &"d", &"b"]));
+        assert_eq!(iter.next(), Some(vec![&"a", &"d", &"b", &"c"]));
         assert_eq!(iter.next(), Some(vec![&"a", &"d", &"c", &"b"]));
         assert_eq!(iter.next(), Some(vec![&"b", &"a", &"c", &"d"]));
         assert_eq!(iter.next(), Some(vec![&"b", &"a", &"d", &"c"]));
-        assert_eq!(iter.next(), Some(vec![&"c", &"a", &"b", &"d"]));
-        assert_eq!(iter.next(), Some(vec![&"d", &"a", &"b", &"c"]));
-        assert_eq!(iter.next(), Some(vec![&"c", &"a", &"d", &"b"]));
-        assert_eq!(iter.next(), Some(vec![&"d", &"a", &"c", &"b"]));
         assert_eq!(iter.next(), Some(vec![&"b", &"c", &"a", &"d"]));
-        assert_eq!(iter.next(), Some(vec![&"b", &"d", &"a", &"c"]));
-        assert_eq!(iter.next(), Some(vec![&"c", &"b", &"a", &"d"]));
-        assert_eq!(iter.next(), Some(vec![&"d", &"b", &"a", &"c"]));
-        assert_eq!(iter.next(), Some(vec![&"c", &"d", &"a", &"b"]));
-        assert_eq!(iter.next(), Some(vec![&"d", &"c", &"a", &"b"]));
         assert_eq!(iter.next(), Some(vec![&"b", &"c", &"d", &"a"]));
+        assert_eq!(iter.next(), Some(vec![&"b", &"d", &"a", &"c"]));
         assert_eq!(iter.next(), Some(vec![&"b", &"d", &"c", &"a"]));
+        assert_eq!(iter.next(), Some(vec![&"c", &"a", &"b", &"d"]));
+        assert_eq!(iter.next(), Some(vec![&"c", &"a", &"d", &"b"]));
+        assert_eq!(iter.next(), Some(vec![&"c", &"b", &"a", &"d"]));
         assert_eq!(iter.next(), Some(vec![&"c", &"b", &"d", &"a"]));
-        assert_eq!(iter.next(), Some(vec![&"d", &"b", &"c", &"a"]));
+        assert_eq!(iter.next(), Some(vec![&"c", &"d", &"a", &"b"]));
         assert_eq!(iter.next(), Some(vec![&"c", &"d", &"b", &"a"]));
+        assert_eq!(iter.next(), Some(vec![&"d", &"a", &"b", &"c"]));
+        assert_eq!(iter.next(), Some(vec![&"d", &"a", &"c", &"b"]));
+        assert_eq!(iter.next(), Some(vec![&"d", &"b", &"a", &"c"]));
+        assert_eq!(iter.next(), Some(vec![&"d", &"b", &"c", &"a"]));
+        assert_eq!(iter.next(), Some(vec![&"d", &"c", &"a", &"b"]));
         assert_eq!(iter.next(), Some(vec![&"d", &"c", &"b", &"a"]));
         assert_eq!(iter.next(), None);
     }
