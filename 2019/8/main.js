@@ -1,8 +1,11 @@
 const fs = require("fs");
 
-const BLACK = 0;
-const WHITE = 1;
-const TRANSP = 2;
+const BLACK = "0";
+const WHITE = "1";
+const TRANSP = "2";
+
+const ESC_BLACK = "30";
+const ESC_WHITE = "37";
 
 const assert = (b, desc) => {
 	if(!b){
@@ -46,6 +49,34 @@ const countdigits = (layer, digit) => {
 	return count;
 };
 
+const resolve_pixel = (img, w, h) => {
+	for(const layer of img){
+		const pixel = layer[h][w];
+		switch(pixel){
+			case BLACK:
+			case WHITE:
+				return pixel;
+			case TRANSP:
+				break;
+			default:
+				assert(false, `unknown pixel "${layer[w][h]}"`);
+		}
+	}
+	return BLACK;
+};
+
+const resolve = (img, width, height) => {
+	const resolved = Array(height).fill(0).map(() => Array(width).fill(TRANSP));
+
+	for(let w = 0; w < width; w++){
+		for(let h = 0; h < height; h++){
+			resolved[h][w] = resolve_pixel(img, w, h);
+		}
+	}
+
+	return resolved;
+};
+
 const eg1 = () => {
 	const img = parse("123456789012", 3, 2);
 
@@ -64,11 +95,17 @@ const eg1 = () => {
 	assert(countdigits(img[1], "2") == 1);
 };
 
-const main = () => {
-	const input = fs.readFileSync("./input", "utf8").trim();
+const eg2 = () => {
+	const img = parse("0222112222120000", 2, 2);
+	const r = resolve(img, 2, 2);
 
-	const img = parse(input, 25, 6);
+	assert(r[0][0] == BLACK);
+	assert(r[0][1] == WHITE);
+	assert(r[1][0] == WHITE);
+	assert(r[1][1] == BLACK);
+};
 
+const part1 = img => {
 	//console.log(JSON.stringify(img));//, 0, 2));
 
 	let min = Infinity, minlayer;
@@ -93,5 +130,29 @@ const main = () => {
 	console.log(nones * ntwos);
 };
 
+const part2 = (img, width, height) => {
+	const r = resolve(img, width, height);
+
+	for(let h = 0; h < height; h++){
+		let s = "";
+		for(let w = 0; w < width; w++){
+			const c = r[h][w] == BLACK ? ESC_BLACK : ESC_WHITE;
+
+			s += `\x1b[0;${c}mX`
+		}
+		console.log(s + "\x1b[0;0m");
+	}
+};
+
+const main = () => {
+	const input = fs.readFileSync("./input", "utf8").trim();
+
+	const img = parse(input, 25, 6);
+
+	//part1(img);
+	part2(img, 25, 6);
+};
+
 eg1();
+eg2();
 main();
