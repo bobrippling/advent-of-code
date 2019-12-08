@@ -286,7 +286,7 @@ mod tests {
     use super::*;
 
     fn expect_io(input: Word, expected_output: Word, memory: &[Word]) {
-        let mut bytes = Vec::from(&memory[..]);
+        let mut bytes = Vec::from(memory);
         let mut input = vec![input];
 
         let output = interpret_oneshot(&mut bytes, &mut input);
