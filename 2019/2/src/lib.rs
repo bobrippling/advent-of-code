@@ -9,6 +9,7 @@ const OP_JNZ: Word = 5; // [1] && jmp [2]
 const OP_JZ: Word = 6; // [1] == 0 && jmp [2]
 const OP_LT: Word = 7; // [1] < [2] --> [3]
 const OP_EQ: Word = 8; // [1] == [2] --> [3]
+const OP_RELATIVE_BASE: Word = 9; // [1] == [2] --> [3]
 
 macro_rules! debug {
     ( $self: ident, $fmt: literal) => {
@@ -39,32 +40,26 @@ pub struct IntCodeMachine {
 
     mem: Vec<Word>,
     ip: usize,
+    relative_base: Word,
 
     debug: bool,
 }
 
+#[derive(Debug)]
 enum Operand {
     Position(Word),
     Immediate(Word),
+    RelativeBase(Word),
 }
 
-impl Operand {
-    fn unwrap_as_position(&self) -> Word {
-        match *self {
-            Operand::Position(w) => w,
-            _ => panic!()
-        }
-    }
-}
-
-fn operand_is_deref(op: Word, iparam: usize) -> bool {
+fn operand_mode(op: Word, iparam: usize) -> Word {
     let mut paramcodes = op / 100;
 
     for _ in 0 .. iparam {
         paramcodes /= 10;
     }
 
-    paramcodes % 10 == 0
+    paramcodes % 10
 }
 
 fn decode_opcode(op: Word) -> Word {
@@ -77,6 +72,7 @@ impl IntCodeMachine {
             state: State::Running,
             mem: From::from(mem),
             ip: 0,
+            relative_base: 0,
             debug,
         }
     }
@@ -85,29 +81,46 @@ impl IntCodeMachine {
         self.state
     }
 
-    fn decode_operand(&self, index: usize) -> Operand {
-        let op = self.mem[self.ip];
-        let operand = self.mem[self.ip + 1 + index];
+    fn memref(&mut self, index: usize) -> &mut Word {
+        if index >= self.mem.len() {
+            self.mem.resize(index + 1, 0);
+        }
+        &mut self.mem[index]
+    }
 
-        if operand_is_deref(op, index) {
-            Operand::Position(operand)
-        } else {
-            Operand::Immediate(operand)
+    fn mem(&mut self, index: usize) -> Word {
+        *self.memref(index)
+    }
+
+    fn decode_operand(&mut self, index: usize) -> Operand {
+        let op = self.mem(self.ip);
+        let operand = self.mem(self.ip + 1 + index);
+
+        match operand_mode(op, index) {
+            0 => Operand::Position(operand),
+            1 => Operand::Immediate(operand),
+            2 => Operand::RelativeBase(operand),
+            _ => panic!(),
         }
     }
 
-    fn operand_input(&self, index: usize) -> Word {
+    fn operand_input(&mut self, index: usize) -> Word {
         match self.decode_operand(index) {
-            Operand::Position(pos) => self.mem[pos as usize],
+            Operand::Position(pos) => self.mem(pos as usize),
             Operand::Immediate(val) => val,
+            Operand::RelativeBase(val) => self.mem((self.relative_base + val) as usize),
         }
     }
 
     fn operand_output(&mut self, index: usize) -> (&mut Word, Word) {
-        let pos = self.decode_operand(index)
-            .unwrap_as_position();
+        let op = self.decode_operand(index);
+        let pos = match op {
+            Operand::Position(w) => w,
+            Operand::Immediate(_) => panic!("can't output to {:?}", op),
+            Operand::RelativeBase(w) => self.relative_base + w,
+        };
 
-        (&mut self.mem[pos as usize], pos)
+        (self.memref(pos as usize), pos)
     }
 
     /*
@@ -131,7 +144,7 @@ impl IntCodeMachine {
         let mut output = Vec::new();
 
         loop {
-            let isn = self.mem[self.ip];
+            let isn = self.mem(self.ip);
 
             match decode_opcode(isn) {
                 OP_ADD => {
@@ -245,6 +258,16 @@ impl IntCodeMachine {
                     self.ip += 4;
                 },
 
+                OP_RELATIVE_BASE => {
+                    let operand = self.operand_input(0);
+
+                    self.relative_base += operand;
+
+                    debug!(self, "relative base <-- {} (operand {})", self.relative_base, operand);
+
+                    self.ip += 2;
+                },
+
                 OP_HALT => {
                     debug!(self, "halt");
                     self.state = State::Halted;
@@ -262,7 +285,7 @@ impl IntCodeMachine {
 }
 
 #[cfg(test)]
-pub fn interpret_oneshot(
+pub fn interpret_oneshot_mutmem(
     mem: &mut [Word],
     inputs: &mut Vec<Word>,
 ) -> Vec<Word> {
@@ -282,14 +305,28 @@ pub fn interpret_oneshot(
 }
 
 #[cfg(test)]
+pub fn interpret_oneshot(
+    mem: &[Word],
+    inputs: &mut Vec<Word>,
+) -> Vec<Word> {
+    let mut machine = IntCodeMachine::new(mem, false);
+
+    let output = machine.interpret_async(inputs);
+
+    match machine.state {
+        State::Running => panic!("oneshot failed to complete"),
+        State::Halted => output,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
     fn expect_io(input: Word, expected_output: Word, memory: &[Word]) {
-        let mut bytes = Vec::from(memory);
         let mut input = vec![input];
 
-        let output = interpret_oneshot(&mut bytes, &mut input);
+        let output = interpret_oneshot(memory, &mut input);
 
         assert_eq!(output.len(), 1);
         assert_eq!(output[0], expected_output);
@@ -297,42 +334,48 @@ mod tests {
 
     #[test]
     fn test_day5_addressing() {
-        assert_eq!(operand_is_deref(1002, 0), true);
-        assert_eq!(operand_is_deref(1002, 1), false);
+        assert_eq!(operand_mode(1002, 0), 0);
+        assert_eq!(operand_mode(1002, 1), 1);
+
+        assert_eq!(operand_mode(0202, 0), 2);
+        assert_eq!(operand_mode(0202, 1), 0);
+
+        assert_eq!(operand_mode(1202, 0), 2);
+        assert_eq!(operand_mode(1202, 1), 1);
     }
 
     #[test]
     fn test_day2_part1_eg0() {
         let mut bytes = [1, 9, 10, 3, 2, 3, 11, 0, 99, 30, 40, 50];
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50]);
     }
 
     #[test]
     fn test_day2_part1_eg1() {
         let mut bytes = [1, 0, 0, 0, 99];
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 0, 0, 0, 99]);
     }
 
     #[test]
     fn test_day2_part1_eg2() {
         let mut bytes = [2, 3, 0, 3, 99];
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 3, 0, 6, 99]);
     }
 
     #[test]
     fn test_day2_part1_eg3() {
         let mut bytes = [2, 4, 4, 5, 99, 0];
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [2, 4, 4, 5, 99, 9801]);
     }
 
     #[test]
     fn test_day2_part1_eg4() {
         let mut bytes = [1, 1, 1, 4, 99, 5, 6, 0, 99];
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [30, 1, 1, 4, 2, 5, 6, 0, 99]);
     }
 
@@ -340,14 +383,14 @@ mod tests {
     fn test_day5_part1_eg1() {
         let mut bytes = [1101,100,-1,4,0];
         //is a valid program (find 100 + -1, store the result in position 4)
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [1101,100,-1,4,100 + -1]);
     }
 
     #[test]
     fn test_day5_part1_eg2() {
         let mut bytes = [1002,4,3,4,33]; // exit after mul
-        interpret_oneshot(&mut bytes, &mut Default::default());
+        interpret_oneshot_mutmem(&mut bytes, &mut Default::default());
         assert_eq!(bytes, [1002,4,3,4,99]);
     }
 
@@ -420,5 +463,64 @@ mod tests {
         expect_io(7, 999, &bytes);
         expect_io(8, 1000, &bytes);
         expect_io(9, 1001, &bytes);
+    }
+
+    #[test]
+    fn test_day9_relative_base() {
+        let mem = [
+            109,3, // relative base: 3
+            109,4, // relative base: 7
+            204,-5, // output value at address 2 (109)
+            99,
+        ];
+
+        let output = interpret_oneshot(&mem, &mut Default::default());
+
+        assert_eq!(output, vec![109]);
+    }
+
+    #[test]
+    fn test_day9_oob() {
+        let mem = [
+            4,20, // output value at address 20 (0)
+            99,
+        ];
+
+        let output = interpret_oneshot(&mem, &mut Default::default());
+
+        assert_eq!(output, vec![0]);
+    }
+
+    #[test]
+    fn test_day9_eg1() {
+        let mem = [
+            109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99
+        ];
+
+        let output = interpret_oneshot(&mem, &mut Default::default());
+
+        assert_eq!(output, mem);
+    }
+
+    #[test]
+    fn test_day9_eg2() {
+        let mem = [
+            1102,34915192,34915192,7,4,7,99,0
+        ];
+
+        let output = interpret_oneshot(&mem, &mut Default::default());
+
+        assert_eq!(output, vec![1219070632396864]);
+    }
+
+    #[test]
+    fn test_day9_eg3() {
+        let mem = [
+            104,1125899906842624,99
+        ];
+
+        let output = interpret_oneshot(&mem, &mut Default::default());
+
+        assert_eq!(output, vec![1125899906842624]);
     }
 }
