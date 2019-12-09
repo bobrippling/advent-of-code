@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-require '../lib';
+require '../lib.pl';
 
 sub fuel_for_mass {
 	my $mass = shift();
