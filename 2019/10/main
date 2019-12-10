@@ -1,0 +1,633 @@
+// You fly into the asteroid belt and reach the Ceres monitoring station. The Elves here have an emergency: they're having trouble tracking all of the asteroids and can't be sure they're safe.
+//
+// The Elves would like to build a new monitoring station in a nearby area of space; they hand you a map of all of the asteroids in that region (your puzzle input).
+//
+// The map indicates whether each position is empty (.) or contains an asteroid (#). The asteroids are much smaller than they appear on the map, and every asteroid is exactly in the center of its marked position. The asteroids can be described with X,Y coordinates where X is the distance from the left edge and Y is the distance from the top edge (so the top-left corner is 0,0 and the position immediately to its right is 1,0).
+//
+// Your job is to figure out which asteroid would be the best place to build a new monitoring station. A monitoring station can detect any asteroid to which it has direct line of sight - that is, there cannot be another asteroid exactly between them. This line of sight can be at any angle, not just lines aligned to the grid or diagonally. The best location is the asteroid that can detect the largest number of other asteroids.
+//
+// For example, consider the following map:
+//
+// .#..#
+// .....
+// #####
+// ....#
+// ...X#
+//
+// The best location for a new monitoring station on this map is the highlighted asteroid at 3,4 because it can detect 8 asteroids, more than any other location. (The only asteroid it cannot detect is the one at 1,0; its view of this asteroid is blocked by the asteroid at 2,2.) All other asteroids are worse locations; they can detect 7 or fewer other asteroids. Here is the number of other asteroids a monitoring station on each asteroid could detect:
+//
+// .7..7
+// .....
+// 67775
+// ....7
+// ...87
+//
+// Here is an asteroid (#) and some examples of the ways its line of sight might be blocked. If there were another asteroid at the location of a capital letter, the locations marked with the corresponding lowercase letter would be blocked and could not be detected:
+//
+// #.........
+// ...A......
+// ...B..a...
+// .EDCG....a
+// ..F.c.b...
+// .....c....
+// ..efd.c.gb
+// .......c..
+// ....f...c.
+// ...e..d..c
+//
+// Here are some larger examples:
+//
+//     Best is 5,8 with 33 other asteroids detected:
+//
+//     ......#.#.
+//     #..#.#....
+//     ..#######.
+//     .#.#.###..
+//     .#..#.....
+//     ..#....#.#
+//     #..#....#.
+//     .##.#..###
+//     ##...#..#.
+//     .#....####
+//
+//     Best is 1,2 with 35 other asteroids detected:
+//
+//     #.#...#.#.
+//     .###....#.
+//     .#....#...
+//     ##.#.#.#.#
+//     ....#.#.#.
+//     .##..###.#
+//     ..#...##..
+//     ..##....##
+//     ......#...
+//     .####.###.
+//
+//     Best is 6,3 with 41 other asteroids detected:
+//
+//     .#..#..###
+//     ####.###.#
+//     ....###.#.
+//     ..###.##.#
+//     ##.##.#.#.
+//     ....###..#
+//     ..#.#..#.#
+//     #..#.#.###
+//     .##...##.#
+//     .....#.#..
+//
+//     Best is 11,13 with 210 other asteroids detected:
+//
+//     .#..##.###...#######
+//     ##.############..##.
+//     .#.######.########.#
+//     .###.#######.####.#.
+//     #####.##.#.##.###.##
+//     ..#####..#.#########
+//     ####################
+//     #.####....###.#.#.##
+//     ##.#################
+//     #####.##.###..####..
+//     ..######..##.#######
+//     ####.##.####...##..#
+//     .#####..#.######.###
+//     ##...#.##########...
+//     #.##########.#######
+//     .####.#.###.###.#.##
+//     ....##.##.###..#####
+//     .#.#.###########.###
+//     #.#.#.#####.####.###
+//     ###.##.####.##.#..##
+//
+// Find the best location for a new monitoring station. How many other asteroids can be detected from that location?
+
+const countChars = (s, c) => {
+	let n = 0;
+	for(const ch of s)
+		if(ch == c)
+			n++;
+	return n;
+}
+
+const parse = str => {
+	const rows = str.split("\n").filter(x=>x);
+	const map = rows.map(row => row.split(/(:?)/).filter(x=>x).map(ch => ({ ch })));
+
+	map.height = map.length;
+	map.width = map[0].length;
+
+	return map;
+};
+
+function* asteroids(map) {
+	for(let y = 0; y < map.length; y++){
+		const row = map[y];
+		for(let x = 0; x < row.length; x++){
+			const { ch } = row[x];
+			if(ch === "#")
+				yield { x, y };
+		}
+	}
+};
+
+const inBounds = (map, { x, y }) => {
+	if(x != undefined){
+		if(x < 0)
+			return false;
+		if(x >= map.width)
+			return false;
+	}
+	if(y != undefined){
+		if(y < 0)
+			return false;
+		if(y >= map.height)
+			return false;
+	}
+	return true;
+};
+
+const pointEq = (a, b) => a.x === b.x && a.y === b.y;
+
+/*
+function* directions() {
+	// N, NE, E, SE, S, SW, W, NW
+	yield { x:  0, y:  1 };
+	yield { x:  1, y:  1 };
+	yield { x:  1, y:  0 };
+	yield { x:  1, y: -1 };
+	yield { x:  0, y: -1 };
+	yield { x: -1, y: -1 };
+	yield { x: -1, y:  0 };
+	yield { x: -1, y: -1 };
+};
+function* scaledDirections() {
+	for({ x, y }) of directions){
+		yield { x: x * step.x, y: y * step.y };
+	}
+}
+
+for(const direction of scaledDirections()){
+	for(let y = from.y; inBounds({ y }); y += direction.y){
+		for(let x = from.x; inBounds({ x }); x += direction.x){
+			shadeFn({ x, y });
+		}
+	}
+}
+*/
+const isCompassDirection = ({ x, y }) => {
+	const a = Math.abs(x);
+	const b = Math.abs(y);
+
+	return a === b // unit direction
+		|| a == 0
+		|| b == 0;
+};
+
+const assert = b => {
+	if(!b){
+		throw new Error("assertion failed");
+	}
+};
+
+const assertEq = (a, b) => {
+	if(a !== b){
+		throw new Error(`assertion failed: ${a} != ${b}`);
+	}
+};
+
+const isDivisible = (top, bot) =>
+	bot !== 0 && (top / bot === Math.round(top / bot));
+
+assert(isDivisible(10, 5));
+assert(isDivisible(10, 2));
+assert(isDivisible(-8, 4));
+
+assert(!isDivisible(4, -8));
+assert(!isDivisible(5, 10));
+
+const toUnits = ({ x, y }) => {
+	const signX = Math.sign(x);
+	const signY = Math.sign(y);
+
+	x = Math.abs(x);
+	y = Math.abs(y);
+
+	if(x === 0)
+		y = 1;
+	if(y === 0)
+		x = 1;
+
+	for(let i = Math.min(x, y); i > 1; i--){
+		if(isDivisible(x, i) && isDivisible(y, i)){
+			x /= i;
+			y /= i;
+		}
+	}
+	/*
+	while(y > 1 && isDivisible(x, y)){
+		x /= y;
+		y /= y;
+	}
+	while(x > 1 && isDivisible(y, x)){
+		y /= x;
+		x /= x;
+	}
+	*/
+
+	if(x === y){
+		x = 1;
+		y = 1;
+	}
+
+	const r = {
+		x: signX * x,
+		y: signY * y,
+	};
+	//console.log("toUnits(", { x, y }, ") --> ", r);
+	return r;
+};
+
+//console.log(toUnits({ x: 4, y: -2 }));
+assertEq(toUnits({ x: 4, y: -2 }).x, 2);
+assertEq(toUnits({ x: 4, y: -2 }).y, -1);
+
+assertEq(toUnits({ x: -12, y: 8 }).x, -3);
+assertEq(toUnits({ x: -12, y: 8 }).y, 2);
+
+const rayTrace = (map, from, direction, traceCb) => {
+	const { x: xFrom, y: yFrom } = from;
+	const { x: xTo, y: yTo } = direction;
+	const step = toUnits({
+		x: (xTo - xFrom),
+		y: (yTo - yFrom),
+	});
+
+	/*
+	if(!isCompassDirection(step))
+		return;
+	*/
+
+	/*
+	console.log(
+		"rayTrace, start:",
+		from,
+		"to:",
+		direction,
+		"step:",
+		step);
+	*/
+
+	let y = yTo;
+	let x = xTo;
+
+	if(DEBUG){
+		console.log("    raytrace from",
+			{ x, y },
+			", step",
+			step
+			//,
+			//`(${xTo}-${xFrom},${yTo}-${yFrom})`
+		);
+	}
+
+	for(;
+		inBounds(map, { y }) && inBounds(map, { x });
+		y += step.y, x += step.x
+	){
+		if(pointEq({ x, y }, from))
+			continue;
+
+		//console.log("shadeFn(", {x, y}, ")");
+		traceCb({ x, y }, step);
+		//console.log(`${x} += ${step.x}`);
+	}
+};
+
+const countUnshaded = (map, isShaded) => {
+	let count = 0;
+	for(let y = 0; y < map.height; y++){
+		for(let x = 0; x < map.width; x++){
+			if(map[y][x].ch !== "#")
+				continue;
+			if(isShaded({ x, y }))
+				continue;
+			count++;
+		}
+	}
+	return count;
+};
+
+const distance = (a, b) => {
+	const dx = a.x - b.x;
+	const dy = a.y - b.y;
+	return Math.sqrt(dx ** 2 + dy ** 2);
+};
+
+const showScratchedFor = (map, src, getScratch) => {
+	console.log("  visibility for", src, " (vis:#, shade:@)");
+
+	let s = "";
+	for(let x = 0; x < map.width; x++){
+		s += `${x}`
+	}
+	console.log(`    ${s}`);
+
+	for(let y = 0; y < map.height; y++){
+		let s = "";
+		for(let x = 0; x < map.width; x++){
+			let { ch } = map[y][x];
+
+			if(pointEq(src, {x,y})){
+				ch = "o";
+			}else if(ch === "#"){
+				const ent = getScratch({x, y});
+
+				if(!ent){
+					ch = "?";
+				}else if(ent.visible){
+					ch = "#"; //ent.letter;
+					//if(ch > "z")
+					//	ch = "#";
+				}else{
+					ch = "@";
+				}
+			}
+
+			s += `${ch}`;
+		}
+		console.log(`  ${y < 10 ? " " + y : y} ` + s);
+	}
+};
+
+const bestLocation = (map) => {
+	let scratchMap;
+	const scratch = ({ x, y }, value) => scratchMap[`${x}-${y}`] = value;
+	const getScratch = ({ x, y }) => scratchMap[`${x}-${y}`];
+
+	let mostVisible = { count: 0, pos: null };
+
+	for(const asteroidSrc of asteroids(map)){
+		scratchMap = {};
+
+		const nextAsteroids = [...asteroids(map)]
+			.sort((a, b) => {
+				const dista = distance(a, asteroidSrc);
+				const distb = distance(b, asteroidSrc);
+
+				if(dista < distb)
+					return -1;
+				if(dista > distb)
+					return +1;
+				return 0;
+			});
+
+		if(DEBUG)
+			console.log("asteroid", asteroidSrc);
+		/*for(const other of nextAsteroids){
+			console.log("  next:", other);
+		}*/
+
+		// --- shade ---
+		let letterIndex = 0;
+		for(const asteroidDest of nextAsteroids){
+			if(pointEq(asteroidSrc, asteroidDest))
+				continue;
+
+			let s = getScratch(asteroidDest);
+			if(s){
+				if(DEBUG)
+					console.log("  ", asteroidDest, "already marked as", s);
+				continue;
+			}
+
+			const currentLetter = String.fromCharCode("A".charCodeAt(0) + letterIndex);
+			const shadeLetter = String.fromCharCode("a".charCodeAt(0) + letterIndex);
+			letterIndex++;
+
+			if(DEBUG)
+				console.log("  marking", asteroidDest, `as visible (${currentLetter})`);
+
+			scratch(asteroidDest, { letter: currentLetter, visible: true });
+
+			rayTrace(map, asteroidSrc, asteroidDest, (pos, step) => {
+				if(pointEq(pos, asteroidSrc))
+					return;
+				if(pointEq(pos, asteroidDest))
+					return;
+
+				const { x, y } = pos;
+				if(map[y][x].ch !== '#')
+					return;
+
+				if(!getScratch(pos)){
+					if(DEBUG)
+						console.log("    .. which then shades", pos, " (step:", step, ")");
+					scratch(pos, { letter: shadeLetter, visible: false });
+				}
+			});
+		}
+
+		const visibleCount = Object.values(scratchMap)
+			.filter(({ visible }) => visible)
+			.length;
+			//+ 1; // +1 for the current asteroid itself
+
+		if(DEBUG)
+			showScratchedFor(map, asteroidSrc, getScratch);
+
+		if(DEBUG)
+			console.log(`  total ${visibleCount} visible asteroids`);
+
+		if(visibleCount > mostVisible.count){
+			mostVisible = {
+				count: visibleCount,
+				pos: asteroidSrc,
+				scratchMap,
+			};
+		}
+	}
+
+	return mostVisible;
+};
+
+const showMap = map => {
+	console.log(`map: ${map.width} x ${map.height}`);
+	for(let y = 0; y < map.height; y++){
+		let s = "";
+		for(let x = 0; x < map.width; x++)
+			try {
+				s += `${map[y][x].ch}`;
+			}catch(e){
+				console.error(e, {x,y});
+			}
+		console.log(s);
+	}
+};
+
+const part1_check = (s, pos, count, name) => {
+	const map = parse(s);
+	//showMap(map);
+
+	//console.log("asteroids:");
+	//for(const a of asteroids(map)){
+	//	console.log(a);
+	//}
+	//return;
+
+	const best = bestLocation(map);
+	if(best.pos && pointEq(best.pos, pos) && best.count === count){
+		console.log(`${name} ok`);
+	}else{
+		console.error(`\x1b[31m${name} failed\x1b[0m`);
+		console.error(`  expected:`, { count, pos });
+
+		const { scratchMap, ...rest } = best;
+
+		console.error(`  got:`, rest);
+
+		const getScratch = ({ x, y }) => scratchMap[`${x}-${y}`]; // FIXME: dup
+		showScratchedFor(map, pos, getScratch);
+	}
+};
+
+const part1_eg1 = () => {
+	const s =
+		".#..#\n" +
+		".....\n" +
+		"#####\n" +
+		"....#\n" +
+		"...##\n";
+
+	part1_check(s, { x: 3, y: 4 }, 8, "part1_eg1");
+};
+
+const part1_eg1point5 = () => {
+	const s =
+		"#.........\n" +
+		"...#......\n" +
+		"...#..#...\n" +
+		".####....#\n" +
+		"..#.#.#...\n" +
+		".....#....\n" +
+		"..###.#.##\n" +
+		".......#..\n" +
+		"....#...#.\n" +
+		"...#..#..#\n";
+
+	//part1_check(s, { x: 5, y: 8 }, 33, "part1_eg1point5");
+
+	/*
+	const expected =
+		"#.........\n" +
+		"...A......\n" +
+		"...B..a...\n" +
+		".EDCG....a\n" +
+		"..F.c.b...\n" +
+		".....c....\n" +
+		"..efd.c.gb\n" +
+		".......c..\n" +
+		"....f...c.\n" +
+		"...e..d..c\n";
+		*/
+};
+
+const part1_eg2 = () => {
+	const s =
+		"......#.#.\n" +
+		"#..#.#....\n" +
+		"..#######.\n" +
+		".#.#.###..\n" +
+		".#..#.....\n" +
+		"..#....#.#\n" +
+		"#..#....#.\n" +
+		".##.#..###\n" +
+		"##...#..#.\n" +
+		".#....####";
+	part1_check(s, { x: 5, y: 8 }, 33, "part1_eg2");
+};
+
+const part1_eg3 = () => {
+	const s =
+		"#.#...#.#.\n" +
+		".###....#.\n" +
+		".#....#...\n" +
+		"##.#.#.#.#\n" +
+		"....#.#.#.\n" +
+		".##..###.#\n" +
+		"..#...##..\n" +
+		"..##....##\n" +
+		"......#...\n" +
+		".####.###.";
+
+	part1_check(s, { x: 1, y: 2 }, 35, "part1_eg3");
+};
+
+const part1_eg4 = () => {
+	const s =
+		".#..#..###\n" +
+		"####.###.#\n" +
+		"....###.#.\n" +
+		"..###.##.#\n" +
+		"##.##.#.#.\n" +
+		"....###..#\n" +
+		"..#.#..#.#\n" +
+		"#..#.#.###\n" +
+		".##...##.#\n" +
+		".....#.#..";
+
+	part1_check(s, { x: 6, y: 3 }, 41, "part1_eg4");
+};
+
+const part1_eg5 = () => {
+	const s =
+		".#..##.###...#######\n" +
+		"##.############..##.\n" +
+		".#.######.########.#\n" +
+		".###.#######.####.#.\n" +
+		"#####.##.#.##.###.##\n" +
+		"..#####..#.#########\n" +
+		"####################\n" +
+		"#.####....###.#.#.##\n" +
+		"##.#################\n" +
+		"#####.##.###..####..\n" +
+		"..######..##.#######\n" +
+		"####.##.####...##..#\n" +
+		".#####..#.######.###\n" +
+		"##...#.##########...\n" +
+		"#.##########.#######\n" +
+		".####.#.###.###.#.##\n" +
+		"....##.##.###..#####\n" +
+		".#.#.###########.###\n" +
+		"#.#.#.#####.####.###\n" +
+		"###.##.####.##.#..##";
+
+   part1_check(s, { x: 11, y: 13 }, 210, "part1_eg5");
+};
+
+const fs = require("fs");
+
+const part1 = () => {
+	const s = fs.readFileSync("./input", "utf8");
+	const map = parse(s);
+
+	//console.log("got map: ", map);
+	assert(map.height === 33);
+	assert(map.width === 33);
+
+	const { scratchMap, ...best } = bestLocation(map);
+
+	console.log(best);
+
+	const getScratch = ({ x, y }) => scratchMap[`${x}-${y}`]; // FIXME: dup
+	showScratchedFor(map, best.pos, getScratch);
+};
+
+const DEBUG = process.argv[2] == "--debug";
+
+part1_eg1();
+part1_eg2();
+part1_eg3();
+part1_eg4();
+part1_eg5();
+//part1_eg1point5(); // TODO
+part1();
