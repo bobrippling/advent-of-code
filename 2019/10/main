@@ -624,10 +624,63 @@ const part1 = () => {
 
 const DEBUG = process.argv[2] == "--debug";
 
-part1_eg1();
-part1_eg2();
-part1_eg3();
-part1_eg4();
-part1_eg5();
-//part1_eg1point5(); // TODO
-part1();
+//part1_eg1();
+//part1_eg2();
+//part1_eg3();
+//part1_eg4();
+//part1_eg5();
+////part1_eg1point5(); // TODO
+//part1();
+
+const sweepLaser = (map, from, maxShots) => {
+	let direction = {
+		x:  0,
+		y: -1,
+	};
+
+
+};
+
+const toSet = s => {
+	const rows = str.split("\n").filter(x=>x);
+	const all = [];
+
+	for(let y = 0; y < chars.length; y++){
+		const row = rows[y];
+
+		const chars = row.split(/(:?)/).filter(x=>x);
+
+		for(let x = 0; x < chars.length; x++){
+			all.push({ x, y });
+		}
+	}
+
+	return all;
+};
+
+const part2 = (s) => {
+	const asteroids = toSet(s);
+	const origin = { x: 8, y: 3 };
+
+	asteroids
+		.map(({ x, y }) => ({
+			x,
+			y,
+			angle: Math.atan2(origin.x - x, origin.y - y),
+		}))
+		.sort((a, b) =>
+};
+
+const part2_eg1 = () => {
+	const s =
+		".#....#####...#..\n" +
+		"##...##.#####..##\n" +
+		"##...#...#.#####.\n" +
+		"..#.....X...###..\n" +
+		"..#.#.....#....##\n";
+
+	part2(s);
+
+};
+
+part2_eg1();
