@@ -61,6 +61,14 @@
 //
 // Build a new emergency hull painting robot and run the Intcode program on it. How many panels does it paint at least once?
 
+// part 2
+// You're not sure what it's trying to paint, but it's definitely not a registration identifier. The Space Police are getting impatient.
+//
+// Checking your external ship cameras again, you notice a white panel marked "emergency hull painting robot starting panel". The rest of the panels are still black, but it looks like the robot was expecting to start on a white panel, not a black one.
+//
+// Based on the Space Law Space Brochure that the Space Police attached to one of your windows, a valid registration identifier is always eight capital letters. After starting the robot on a single white panel instead, what registration identifier does it paint on your hull?
+//
+
 use std::fs;
 
 mod lib;
@@ -171,6 +179,8 @@ struct Robot {
     brain: IntCodeMachine,
     painted: PaintGrid,
 
+    start: bool,
+
     location: Coord,
     facing: Dir,
 }
@@ -181,9 +191,14 @@ impl Robot {
             return RobotState::Done;
         }
 
-        let colour = match self.painted.get(&self.location) {
-            Some(&c) => c,
-            None => Colour::Black,
+        let colour = if self.start {
+            self.start = false;
+            Colour::White
+        } else {
+            match self.painted.get(&self.location) {
+                Some(&c) => c,
+                None => Colour::Black,
+            }
         };
 
         //println!("current colour: {:?}", colour);
@@ -253,15 +268,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         location: Coord::new(0, 0),
         facing: Dir::Up,
+
+        start: true,
     };
 
     while robot.run() == RobotState::Painting {}
 
-    println!("{} {}",
-             robot.painted.keys().count(),
-             robot.uniq_painted);
+    //println!("{} {}", robot.painted.keys().count());
 
-    //show_paint(&robot.painted);
+    show_paint(&robot.painted);
 
     Ok(())
 }
