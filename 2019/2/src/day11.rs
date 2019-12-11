@@ -136,18 +136,6 @@ enum Dir {
     Right,
 }
 
-impl Dir {
-    fn from(x: Word) -> Self {
-        match x {
-            0 => Self::Up,
-            1 => Self::Down,
-            2 => Self::Left,
-            3 => Self::Right,
-            _ => panic!("invalid dir {}", x),
-        }
-    }
-}
-
 impl std::ops::AddAssign<Turn> for Dir {
     fn add_assign(&mut self, rhs: Turn) {
         *self = match self {
@@ -168,20 +156,6 @@ impl std::ops::AddAssign<Turn> for Dir {
                 Turn::Right => Dir::Down,
             },
         }
-
-        //let i = *self as Word;
-        //let inc = match rhs {
-        //    Turn::Left => -1,
-        //    Turn::Right => 1,
-        //};
-
-        //let mut n = i + inc;
-        //while n < 0 { n += 4; }
-        //while n >= 4 { n -= 4; }
-
-        // Self::Output - self not found
-        //<Self as std::ops::Add<Turn>>::Output(n)
-        //*self = Dir::from(n)
     }
 }
 
