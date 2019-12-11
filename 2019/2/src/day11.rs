@@ -221,8 +221,8 @@ fn show_paint(painted: &PaintGrid) {
     };
 
     println!("painted, min: {:?}, max: {:?}", min, max);
-    for y in min.y .. max.y {
-        for x in min.x .. max.x {
+    for y in min.y ..= max.y {
+        for x in min.x ..= max.x {
             let colour = painted
                    .get(&Coord { x, y })
                    .map(|&c| c)
