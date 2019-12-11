@@ -173,8 +173,6 @@ struct Robot {
 
     location: Coord,
     facing: Dir,
-
-    uniq_painted: usize,
 }
 
 impl Robot {
@@ -203,11 +201,7 @@ impl Robot {
     }
 
     fn paint(&mut self, new_colour: Colour) {
-        let old_colour = self.painted.insert(self.location, new_colour);
-
-        if old_colour.is_none() {
-            self.uniq_painted += 1;
-        }
+        self.painted.insert(self.location, new_colour);
     }
 
     fn turn_and_move(&mut self, turn: Turn) {
@@ -259,8 +253,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         location: Coord::new(0, 0),
         facing: Dir::Up,
-
-        uniq_painted: 0,
     };
 
     while robot.run() == RobotState::Painting {}
