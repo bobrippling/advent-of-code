@@ -1,8 +1,13 @@
 use std::ops::*;
+use std::hash::{Hash, Hasher};
+use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
+
+//use num::{Integer, Signed};
 
 type Val = isize;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 struct Vec3 {
 	x: Val,
 	y: Val,
@@ -35,6 +40,7 @@ impl Vec3 {
 		Vec3 { x: 0, y: 0, z: 0 }
 	}
 
+	#[allow(dead_code)]
 	fn new(x: Val, y: Val, z: Val) -> Self {
 		Vec3 { x, y, z }
 	}
@@ -58,6 +64,24 @@ impl Vec3 {
 
 	fn abssum(&self) -> Val {
 		self.x.abs() + self.y.abs() + self.z.abs()
+	}
+
+	fn keep(&mut self, i: usize) {
+		match i {
+			0 => {
+				self.y = 0;
+				self.z = 0;
+			},
+			1 => {
+				self.x = 0;
+				self.z = 0;
+			},
+			2 => {
+				self.x = 0;
+				self.y = 0;
+			},
+			_ => panic!(),
+		}
 	}
 }
 
@@ -105,13 +129,13 @@ impl Neg for Vec3 {
 	}
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 struct Pos(Vec3);
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 struct Velocity(Vec3);
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 struct Moon {
 	pos: Pos,
 	vel: Velocity,
@@ -134,6 +158,7 @@ impl Moon {
 	}
 }
 
+#[derive(Hash)]
 struct System {
 	moons: Vec<Moon>,
 }
@@ -188,8 +213,8 @@ impl System {
 	fn apply_gravity(&mut self) {
 		let mut changes = Vec::new();
 
-		for (moon_i, i) in (&self.moons).iter().zip(0..) {
-			for (moon_j, j) in (&self.moons).iter().zip(0..) {
+		for (i, moon_i) in (&self.moons).iter().enumerate() {
+			for (j, moon_j) in (&self.moons).iter().enumerate() {
 				if i == j {
 					continue;
 				}
@@ -220,7 +245,16 @@ impl System {
 	}
 }
 
-fn main() {
+/*
+impl Hash for System {
+	fn hash<H: Hasher>(&self, state: &mut H)  {
+		state.upda
+	}
+}
+*/
+
+#[allow(dead_code)]
+fn part1() {
 	let mut sys = System {
 		moons: vec![
 			Moon::new(-9, -1, -1),
@@ -235,6 +269,102 @@ fn main() {
 	}
 
 	println!("{}", sys.energy());
+}
+
+fn gethash(s: &System) -> u64 {
+	let mut hasher = DefaultHasher::new();
+	s.hash(&mut hasher);
+	hasher.finish()
+
+}
+
+fn divisible(a: Val, b: Val) -> bool {
+	let div = (a as f64) / (b as f64);
+
+	return div == div.round();
+}
+
+fn lcm(ents: &[Val]) -> Val {
+	// broke, used online calculator
+	for i in (1..*ents.iter().max().expect("empty?")).rev() {
+		let mut can = true;
+
+		for &ent in ents {
+			if !divisible(ent, i) {
+				can = false;
+				break;
+			}
+		}
+
+		if can {
+			return i;
+		}
+	}
+	panic!();
+}
+
+fn part2() {
+	let mut prev_states = HashSet::new();
+
+	let start = vec![
+		// mine:
+		Moon::new(-9, -1, -1),
+		Moon::new(2, 9, 5),
+		Moon::new(10, 18, -12),
+		Moon::new(-6, 15, -7),
+
+		// eg1:
+		//Moon::new(-1, 0, 2),
+		//Moon::new(2, -10, -7),
+		//Moon::new(4, -8, 8),
+		//Moon::new(3, 5, -1),
+	];
+
+	let mut iters = [0; 3];
+
+	for part in 0..3 {
+		let mut moons = start.clone();
+
+		// we can do this just for each individual axis, and then we have the time to reach
+		// that same axis state, for all axes. then we find the least common multiple of all
+		// those to find when they all happen to repeat at the same time, faster than the prior
+		// brute force method
+		for m in moons.iter_mut() {
+			m.pos.0.keep(part);
+			m.vel.0.keep(part);
+		}
+
+		let mut sys = System { moons };
+		let mut this_steps = 0;
+
+		for steps in 1.. {
+			prev_states.insert(gethash(&sys));
+
+			sys.step();
+
+			if prev_states.get(&gethash(&sys)).is_some() {
+				//println!("match! after {} steps", steps);
+				this_steps = steps;
+				break;
+			}
+
+			// got to at least 6960000
+
+			/*if steps % 10000 == 0{
+				println!("steps {}, hashes: {}", steps, prev_states.len());
+			}*/
+		}
+		iters[part] = this_steps;
+	}
+
+	println!("{:?}", iters);
+	println!("{}", lcm(&iters));
+	//println!("{}", iters[0].lcm(iters[1]));
+}
+
+fn main() {
+	//part1();
+	part2();
 }
 
 
