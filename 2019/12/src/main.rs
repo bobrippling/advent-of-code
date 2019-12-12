@@ -9,11 +9,22 @@ struct Vec3 {
 	z: Val,
 }
 
+#[allow(dead_code)]
 fn unit(v: Val) -> Val {
 	if v > 0 {
 		1
 	} else if v < 0 {
 		-1
+	} else {
+		0
+	}
+}
+
+fn to(v: Val, u: Val) -> Val {
+	if v > u {
+		-1
+	} else if v < u {
+		1
 	} else {
 		0
 	}
@@ -28,12 +39,25 @@ impl Vec3 {
 		Vec3 { x, y, z }
 	}
 
+	#[allow(dead_code)]
 	fn unit(self) -> Self {
 		Vec3 {
 			x: unit(self.x),
 			y: unit(self.y),
 			z: unit(self.z),
 		}
+	}
+
+	fn to(self, rhs: Self) -> Self {
+		Vec3 {
+			x: to(self.x, rhs.x),
+			y: to(self.y, rhs.y),
+			z: to(self.z, rhs.z),
+		}
+	}
+
+	fn abssum(&self) -> Val {
+		self.x.abs() + self.y.abs() + self.z.abs()
 	}
 }
 
@@ -55,6 +79,7 @@ impl AddAssign<Vec3> for Vec3 {
 	}
 }
 
+/*
 impl Sub<Vec3> for Vec3 {
 	type Output = Vec3;
 
@@ -66,6 +91,7 @@ impl Sub<Vec3> for Vec3 {
 		}
 	}
 }
+*/
 
 impl Neg for Vec3 {
 	type Output = Vec3;
@@ -98,6 +124,14 @@ impl Moon {
 			vel: Velocity(Vec3::zero()),
 		}
 	}
+
+	fn potential_energy(&self) -> Val {
+		self.pos.0.abssum()
+	}
+
+	fn kinetic_energy(&self) -> Val {
+		self.vel.0.abssum()
+	}
 }
 
 struct System {
@@ -107,6 +141,7 @@ struct System {
 #[derive(PartialEq, Debug)]
 struct Change {
 	i: usize,
+	from: usize,
 	v: Vec3,
 }
 
@@ -114,27 +149,33 @@ fn changes_for_moons(
 	(m_i, i): (&Moon, usize),
 	(m_j, j): (&Moon, usize),
 ) -> Vec<Change> {
-	let diff = (m_i.pos.0 - m_j.pos.0).unit();
+	let diff = m_j.pos.0.to(m_i.pos.0); //.unit();
 	let mut changes = Vec::new();
 
 	changes.push(Change {
 		i,
+		from: j,
 		v: -diff,
 	});
-	changes.push(Change {
+	/*changes.push(Change {
 		i: j,
+		from: i,
 		v: diff,
-	});
+	});*/
 
 	changes
 }
 
 fn apply_changes(moons: &mut Vec<Moon>, changes: &Vec<Change>) {
-		for Change { i, v } in changes {
-			moons[*i].vel.0 += *v;
-		}
+	for Change { i, from: _, v } in changes {
+		/*if *i == 0 {
+			println!("moons[{}].vel += {:?} (from {})", *i, *v, *from);
+		}*/
 
-		//for moon in moons {
+		moons[*i].vel.0 += *v;
+	}
+
+	//for moon in moons {
 }
 
 impl System {
@@ -153,7 +194,10 @@ impl System {
 					continue;
 				}
 
-				changes.extend(changes_for_moons(
+				//println!("{} influencing {}", i, j);
+
+				changes.extend(
+					changes_for_moons(
 						(moon_i, i),
 						(moon_j, j)));
 			}
@@ -167,9 +211,30 @@ impl System {
 			moon.pos.0 += moon.vel.0;
 		}
 	}
+
+	fn energy(&self) -> Val {
+		self.moons
+			.iter()
+			.map(|m| m.kinetic_energy() * m.potential_energy())
+			.sum()
+	}
 }
 
 fn main() {
+	let mut sys = System {
+		moons: vec![
+			Moon::new(-9, -1, -1),
+			Moon::new(2, 9, 5),
+			Moon::new(10, 18, -12),
+			Moon::new(-6, 15, -7),
+		],
+	};
+
+	for _ in 1..=1000 {
+		sys.step();
+	}
+
+	println!("{}", sys.energy());
 }
 
 
@@ -181,14 +246,18 @@ mod tests {
 	fn test_day12_diff() {
 		let callisto = Vec3::new(5, 0, 0); // should be -1 to vel
 		let ganymede = Vec3::new(3, 0, 0); // should be +1 to vel
-		let diff = callisto - ganymede;
+		let ganymede2 = Vec3::new(3, 5, 0); // should be +1 to vel
 
-		assert_eq!(diff, Vec3::new(2, 0, 0));
+		assert_eq!(callisto.to(ganymede), Vec3::new(-1, 0, 0));
+		assert_eq!(ganymede.to(callisto), Vec3::new( 1, 0, 0));
+		assert_eq!(ganymede.to(ganymede2), Vec3::new(0, 1, 0));
 
-		assert_eq!(callisto + diff.unit(), Vec3::new(6, 0, 0));
+		//let diff = callisto - ganymede;
+		//assert_eq!(diff, Vec3::new(2, 0, 0));
+		//assert_eq!(callisto + diff.unit(), Vec3::new(6, 0, 0));
 	}
 
-	#[test]
+	/*#[test]
 	fn test_day12_bit_by_bit() {
 		let callisto = Moon { pos: Pos(Vec3::new(5, 7, 0)), vel: Velocity(Vec3::zero()) };
 		let ganymede = Moon { pos: Pos(Vec3::new(3, 7, 0)), vel: Velocity(Vec3::zero()) };
@@ -197,8 +266,8 @@ mod tests {
 		assert_eq!(
 			changes,
 			vec![
-				Change { i: 0, v: Vec3 { x: -1, y: 0, z: 0 } },
-				Change { i: 1, v: Vec3 { x:  1, y: 0, z: 0 } },
+				Change { i: 0, v: Vec3 { x: -1, y: 0, z: 0 }, from: 1 },
+				Change { i: 1, v: Vec3 { x:  1, y: 0, z: 0 }, from: 0 },
 			]);
 
 		let mut moons = vec![callisto, ganymede];
@@ -221,6 +290,7 @@ mod tests {
 				Moon { pos: Pos(Vec3::new(4, 7, 0)), vel: Velocity(Vec3 { x:  1, y: 0, z: 0 }) },
 			]);
 	}
+	*/
 
 	#[test]
 	fn test_day12_velocity() {
@@ -255,6 +325,9 @@ mod tests {
 			]);
 
 		sys.step();
+		// [0].x: +1 from [1], +1 from [2], +1 from [3] -->  3 (x vel)
+		// [0].y: -1 from [1], -1 from [2], +1 from [3] --> -1 (y vel)
+		// [0].z: -1 from [1], +1 from [2], -1 from [3] --> -1 (z vel)
 		assert_eq!(
 			sys.moons,
 			vec![
@@ -353,5 +426,7 @@ mod tests {
 			Moon { pos: Pos(Vec3::new( 3, -6,  1)), vel: Velocity(Vec3::new( 3,  2, -3)) },
 			Moon { pos: Pos(Vec3::new( 2,  0,  4)), vel: Velocity(Vec3::new( 1, -1, -1)) },
 			]);
+
+		assert_eq!(sys.energy(), 179);
 	}
 }
