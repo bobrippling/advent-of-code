@@ -81,6 +81,15 @@ impl IntCodeMachine {
         self.state
     }
 
+    pub fn memory(&self) -> &[Word] {
+        &self.mem
+    }
+
+    pub fn load_memory(&mut self, mem: &[Word]) {
+        self.mem.clear();
+        self.mem.extend_from_slice(mem);
+    }
+
     fn memref(&mut self, index: usize) -> &mut Word {
         if index >= self.mem.len() {
             self.mem.resize(index + 1, 0);
