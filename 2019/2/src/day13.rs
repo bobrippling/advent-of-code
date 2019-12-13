@@ -40,9 +40,12 @@ use lib::{IntCodeMachine, Word, State as ICMState};
 
 const ESC_UP: &str = "\x1b[A";
 
+type Screen = HashMap<Coord, Tile>;
+
 struct Game {
     machine: IntCodeMachine,
-    screen: HashMap<Coord, Tile>,
+    save: (Vec<Word>, Screen),
+    screen: Screen,
     score: Word,
 
     min_x: Word,
@@ -59,7 +62,7 @@ struct Coord {
     y: Word,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 enum Tile {
     Empty,
     Wall,
@@ -68,7 +71,7 @@ enum Tile {
     Ball,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum Joystick {
     Neutral,
     Left,
@@ -82,6 +85,18 @@ impl Joystick {
             Joystick::Left => -1,
             Joystick::Right => 1,
         }
+    }
+}
+
+impl std::fmt::Display for Joystick {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let c = match self {
+            Joystick::Neutral => 'x',
+            Joystick::Left => 'h',
+            Joystick::Right => 'l',
+        };
+        write!(fmt, "{}", c)?;
+        Ok(())
     }
 }
 
@@ -101,13 +116,18 @@ impl Tile {
     }
 }
 
+fn save_input(j: Joystick) {
+    eprintln!("{}", j);
+}
+
 impl Game {
     fn new(bytes: &[Word]) -> Self {
         let machine = IntCodeMachine::new(bytes, false);
 
         Game {
             machine,
-            screen: HashMap::<Coord, Tile>::new(),
+            screen: HashMap::new(),
+            save: (Vec::new(), HashMap::new()),
 
             score: 0,
 
@@ -178,7 +198,7 @@ impl Game {
             }
         }
 
-        println!("score {}", self.score);
+        println!("score {} {}\x1b[0K", self.score, if self.save.0.len() > 0 { "save present" } else { "" });
         for y in self.min_y..=self.max_y {
             for x in self.min_x..=self.max_x {
                 let tile = self.screen.get(&Coord { x, y }).unwrap_or(&Tile::Empty);
@@ -198,6 +218,17 @@ impl Game {
         self.printed = true;
     }
 
+    fn save(&mut self) {
+        self.save.0.clear();
+        self.save.0.extend_from_slice(self.machine.memory());
+        self.save.1 = self.screen.clone();
+    }
+
+    fn load(&mut self) {
+        self.machine.load_memory(&self.save.0);
+        self.screen = self.save.1.clone();
+    }
+
     fn interact(&mut self) {
         let mut stty = Command::new("stty");
         stty.arg("-echo").arg("-icanon");
@@ -208,20 +239,36 @@ impl Game {
         let mut buffer = [0; 1]; // read exactly one byte
 
         let mut inputs = Vec::new();
-        while self.is_active() {
-            self.run(&mut inputs);
+        loop {
+            while self.is_active() {
+                self.run(&mut inputs);
 
-            self.show();
+                let j = loop {
+                    self.show();
+                    stdout.lock().flush().unwrap();
+                    reader.read_exact(&mut buffer).unwrap();
 
-            stdout.lock().flush().unwrap();
-            reader.read_exact(&mut buffer).unwrap();
+                    match buffer[0] as char {
+                        'h' => break Joystick::Left,
+                        'l' => break Joystick::Right,
+                        'S' => {
+                            self.save();
+                        },
+                        'L' => {
+                            self.load();
+                        },
+                        _ => break Joystick::Neutral,
+                    };
+                };
+                inputs.push(j.to());
+                save_input(j);
+            }
 
-            let j = match buffer[0] as char {
-                'h' => Joystick::Left,
-                'l' => Joystick::Right,
-                _ => Joystick::Neutral,
-            };
-            inputs.push(j.to());
+            if self.save.0.len() > 0 {
+                self.load();
+            } else {
+                break;
+            }
         }
     }
 }
