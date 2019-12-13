@@ -15,16 +15,42 @@
 // For example, a sequence of output values like 1,2,3,6,5,4 would draw a horizontal paddle tile (1 tile from the left and 2 tiles from the top) and a ball tile (6 tiles from the left and 5 tiles from the top).
 //
 // Start the game. How many block tiles are on the screen when the game exits?
+//
+// --- Part Two ---
+//
+// The game didn't run because you didn't put in any quarters. Unfortunately, you did not bring any quarters. Memory address 0 represents the number of quarters that have been inserted; set it to 2 to play for free.
+//
+// The arcade cabinet has a joystick that can move left and right. The software reads the position of the joystick with input instructions:
+//
+//     If the joystick is in the neutral position, provide 0.
+//     If the joystick is tilted to the left, provide -1.
+//     If the joystick is tilted to the right, provide 1.
+//
+// The arcade cabinet also has a segment display capable of showing a single number that represents the player's current score. When three output instructions specify X=-1, Y=0, the third output instruction is not a tile; the value instead specifies the new score to show in the segment display. For example, a sequence of output values like -1,0,12345 would show 12345 as the player's current score.
+//
+// Beat the game by breaking all the blocks. What is your score after the last block is broken?
 
 use std::fs;
+use std::io::{self, Write, Read};
 use std::collections::HashMap;
+use std::process::Command;
 
 mod lib;
 use lib::{IntCodeMachine, Word, State as ICMState};
 
+const ESC_UP: &str = "\x1b[A";
+
 struct Game {
     machine: IntCodeMachine,
     screen: HashMap<Coord, Tile>,
+    score: Word,
+
+    min_x: Word,
+    max_x: Word,
+    min_y: Word,
+    max_y: Word,
+
+    printed: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, Hash, Clone)]
@@ -40,6 +66,23 @@ enum Tile {
     Block,
     HorizPaddle,
     Ball,
+}
+
+#[derive(Clone)]
+enum Joystick {
+    Neutral,
+    Left,
+    Right,
+}
+
+impl Joystick {
+    fn to(self) -> Word {
+        match self {
+            Joystick::Neutral => 0,
+            Joystick::Left => -1,
+            Joystick::Right => 1,
+        }
+    }
 }
 
 impl Tile {
@@ -65,6 +108,15 @@ impl Game {
         Game {
             machine,
             screen: HashMap::<Coord, Tile>::new(),
+
+            score: 0,
+
+            min_x: 0,
+            max_x: 0,
+            min_y: 0,
+            max_y: 0,
+
+            printed: false,
         }
     }
 
@@ -75,12 +127,12 @@ impl Game {
         }
     }
 
-    fn run(&mut self) {
-        let outputs = self.machine.interpret_async(&mut vec![]);
+    fn run(&mut self, inputs: &mut Vec<Word>) {
+        let outputs = self.machine.interpret_async(inputs);
 
         assert_eq!(outputs.len() % 3, 0);
 
-        println!("outputs: {}", outputs.len());
+        //println!("outputs: {}", outputs.len());
 
         for i in (0..outputs.len()).step_by(3) {
             let slice = (
@@ -89,41 +141,119 @@ impl Game {
                 outputs[i+2],
             );
 
-            println!("output slice: {:?}", slice);
+            //println!("output slice: {:?}", slice);
 
             let at = Coord {
                 x: slice.0,
                 y: slice.1,
             };
+
+            if at.x == -1 && at.y == 0 {
+                self.score = slice.2;
+                continue;
+            }
+
             let tile = Tile::from(slice.2);
 
+            self.min_x = self.min_x.min(at.x);
+            self.max_x = self.max_x.max(at.x);
+            self.min_y = self.min_y.min(at.y);
+            self.max_y = self.max_y.max(at.y);
             self.screen.insert(at, tile);
         }
     }
 
+    /*
     fn run_til_end(&mut self) {
         while self.is_active() {
             self.run()
         }
     }
+    */
+
+    fn show(&mut self) {
+        if self.printed {
+            for _ in self.min_y..=self.max_y+1 {
+                print!("{}", ESC_UP);
+            }
+        }
+
+        println!("score {}", self.score);
+        for y in self.min_y..=self.max_y {
+            for x in self.min_x..=self.max_x {
+                let tile = self.screen.get(&Coord { x, y }).unwrap_or(&Tile::Empty);
+
+                let c = match tile {
+                    Tile::Empty => ' ',
+                    Tile::Wall => '|',
+                    Tile::Block => '#',
+                    Tile::HorizPaddle => '_',
+                    Tile::Ball => 'o',
+                };
+
+                print!("{}", c);
+            }
+            println!();
+        }
+        self.printed = true;
+    }
+
+    fn interact(&mut self) {
+        let mut stty = Command::new("stty");
+        stty.arg("-echo").arg("-icanon");
+        stty.status().expect("stty failed");
+
+        let stdout = io::stdout();
+        let mut reader = io::stdin();
+        let mut buffer = [0; 1]; // read exactly one byte
+
+        let mut inputs = Vec::new();
+        while self.is_active() {
+            self.run(&mut inputs);
+
+            self.show();
+
+            stdout.lock().flush().unwrap();
+            reader.read_exact(&mut buffer).unwrap();
+
+            let j = match buffer[0] as char {
+                'h' => Joystick::Left,
+                'l' => Joystick::Right,
+                _ => Joystick::Neutral,
+            };
+            inputs.push(j.to());
+        }
+    }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day13")?;
-    let bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
-
-    let mut game = Game::new(&bytes);
+#[allow(unused_code)]
+fn part1(game: &mut Game) {
     game.run_til_end();
 
     println!("{}",
         game.screen
             .values()
             .filter(|&v| v == &Tile::Block)
-            .count());
+            .count());*/
+}
+
+#[allow(unused_code)]
+fn part2(game: &mut Game) {
+    bytes[0] = 2; // play for free
+    let mut game = Game::new(&bytes);
+    game.interact();
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let s = fs::read_to_string("./input-day13")?;
+    let mut bytes = s
+        .trim_end()
+        .split(",")
+        .map(str::parse)
+        .collect::<Result<Vec<Word>, _>>()?;
+
+    //part1();
+    part2();
 
     Ok(())
 }
