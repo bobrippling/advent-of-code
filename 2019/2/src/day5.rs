@@ -1,4 +1,4 @@
-use std::fs;
+mod parse;
 
 fn input() -> Word {
     use std::io;
@@ -26,12 +26,7 @@ fn input() -> Word {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input")?;
-    let bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = parse::bytes("./input")?;
 
     interpret(&mut bytes, &mut Default::default());
     show_bytes(&bytes);

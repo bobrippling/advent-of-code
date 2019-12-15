@@ -8,6 +8,9 @@ mod lib;
 use lib::{IntCodeMachine, Word, State as ICMState};
 use std::collections::HashMap;
 
+mod parse;
+use parse::bytes;
+
 use std::convert::TryInto;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
@@ -213,9 +216,10 @@ impl Robot {
         println!("found at {:?}", self.coord);
     }
 
+    /*
     fn auto(&mut self) {
-        let mut dir = Dir::North;
-        let mut moveback = false;
+        let dir = Dir::North;
+        //let mut moveback = false;
 
         loop {
             let output = self.machine.interpret_async(&mut vec![dir.into()]);
@@ -228,12 +232,15 @@ impl Robot {
 
             match answer {
                 GridEnt::Wall => {
+                    /*
                     if moveback {
                         moveback = false;
                         dir = -dir;
                     } else {
 
                     }
+                    TODO
+                    */
                 },
                 GridEnt::Ok => {
                     self.coord += dir;
@@ -248,15 +255,11 @@ impl Robot {
 
         println!("found at {:?}", self.coord);
     }
+    */
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day15")?;
-    let bytes = s // TODO: factor
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = bytes("./input-day15")?;
 
     let mut robot = Robot {
         machine: IntCodeMachine::new(&bytes, false),

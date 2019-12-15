@@ -1,7 +1,7 @@
-use std::fs;
-
 mod lib;
 use lib::{IntCodeMachine, State, Word};
+
+mod parse;
 
 #[cfg(test)]
 use lib::interpret_oneshot;
@@ -183,12 +183,7 @@ fn find_max_phase_feedback(bytes: &[Word]) -> (Word, Vec<Word>) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day7")?;
-    let bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = parse::bytes("./input-day7")?;
 
     let (max, phase) = find_max_phase_feedback(&bytes);
     println!("max={} phasse={:?}", max, phase);

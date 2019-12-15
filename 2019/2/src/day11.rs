@@ -69,7 +69,7 @@
 // Based on the Space Law Space Brochure that the Space Police attached to one of your windows, a valid registration identifier is always eight capital letters. After starting the robot on a single white panel instead, what registration identifier does it paint on your hull?
 //
 
-use std::fs;
+mod parse;
 
 mod lib;
 use lib::{IntCodeMachine, Word, State as ICMState};
@@ -255,12 +255,7 @@ fn show_paint(painted: &PaintGrid) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day11")?;
-    let bytes = s // TODO: factor
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = parse::bytes("./input-day11")?;
 
     let mut robot = Robot {
         brain: IntCodeMachine::new(&bytes, false),

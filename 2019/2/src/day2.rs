@@ -61,12 +61,7 @@ fn part2(bytes_slice: &[Word]) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day2")?;
-    let bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = crate::parse::bytes("./input-day2")?;
 
     //part1(&bytes);
     //part2(&bytes);
