@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub type Word = i64; // may be signed
 
 const OP_ADD: Word = 1; // *[3] = *[1] + *[2]

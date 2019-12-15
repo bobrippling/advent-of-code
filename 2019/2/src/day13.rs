@@ -281,7 +281,7 @@ fn part1(game: &mut Game) {
         game.screen
             .values()
             .filter(|&v| v == &Tile::Block)
-            .count());*/
+            .count());
 }
 
 #[allow(unused_code)]
