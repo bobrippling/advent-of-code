@@ -45,18 +45,14 @@
 
 // Run the BOOST program in sensor boost mode. What are the coordinates of the distress signal?
 
-use std::fs;
-
 mod lib;
-use lib::{IntCodeMachine, Word};
+use lib::IntCodeMachine;
+
+mod parse;
+use parse::bytes;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day9")?;
-    let bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = bytes("./input-day9")?;
 
     let mut machine = IntCodeMachine::new(&bytes, false);
 

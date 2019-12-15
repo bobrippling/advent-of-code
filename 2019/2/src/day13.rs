@@ -30,7 +30,9 @@
 //
 // Beat the game by breaking all the blocks. What is your score after the last block is broken?
 
-use std::fs;
+mod parse;
+use parse::bytes;
+
 use std::io::{self, Write, Read};
 use std::collections::HashMap;
 use std::process::Command;
@@ -183,13 +185,11 @@ impl Game {
         }
     }
 
-    /*
     fn run_til_end(&mut self) {
         while self.is_active() {
-            self.run()
+            self.run(&mut vec![])
         }
     }
-    */
 
     fn show(&mut self) {
         if self.printed {
@@ -273,8 +273,10 @@ impl Game {
     }
 }
 
-#[allow(unused_code)]
-fn part1(game: &mut Game) {
+#[allow(dead_code)]
+fn part1(bytes: &mut [Word]) {
+    let mut game = Game::new(bytes);
+
     game.run_til_end();
 
     println!("{}",
@@ -284,23 +286,18 @@ fn part1(game: &mut Game) {
             .count());
 }
 
-#[allow(unused_code)]
-fn part2(game: &mut Game) {
+#[allow(dead_code)]
+fn part2(bytes: &mut [Word]) {
     bytes[0] = 2; // play for free
-    let mut game = Game::new(&bytes);
+    let mut game = Game::new(bytes);
     game.interact();
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = fs::read_to_string("./input-day13")?;
-    let mut bytes = s
-        .trim_end()
-        .split(",")
-        .map(str::parse)
-        .collect::<Result<Vec<Word>, _>>()?;
+    let bytes = bytes("./input-day13")?;
 
-    //part1();
-    part2();
+    part1(&mut bytes.clone());
+    part2(&mut bytes.clone());
 
     Ok(())
 }
