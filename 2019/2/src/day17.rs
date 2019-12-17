@@ -5,7 +5,7 @@ use parse::bytes;
 
 mod lib;
 use lib::{IntCodeMachine, Word};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
 struct Coord {
@@ -38,6 +38,21 @@ enum Tile {
     Robot(Dir),
 }
 
+struct View {
+    map: HashMap<Coord, Tile>,
+    markedmap: HashMap<Coord, Mark>,
+
+    min: Coord,
+    max: Coord,
+    nextid: usize,
+}
+
+struct Mark {
+    visited: HashSet<usize>,
+}
+
+struct Route(Vec<Coord>);
+
 impl Tile {
     fn from(ch: char) -> Self {
         match ch {
@@ -63,16 +78,6 @@ impl Tile {
             }
         }
     }
-}
-
-struct View {
-    map: HashMap<Coord, Tile>,
-    min: Coord,
-    max: Coord,
-}
-
-struct Mark {
-    visited: HashSet<usize>,
 }
 
 fn minmax(map: HashMap<Coord, Tile>) -> (Coord, Coord) {
@@ -163,42 +168,64 @@ impl View {
         overlaps
     }
 
-    fn walk_direction(&self, from: &Coord, next: &Coord) {
+    fn walk_direction(
+        &self,
+        id: usize,
+        from: &Coord,
+        next: &Coord,
+        prevroute: &Route
+    ) -> Option<Route> {
         if !self.in_bounds(next) {
             return;
         }
-        if ! self.is_scaffold(next) {
+
+        if !self.is_scaffold(next) {
             return;
         }
+
+        match self.markedmap.get(next) {
+            Some(Mark { ref mut visited }) => {
+                if visited.get(&id) {
+                    return;
+                }
+
+                visited.insert(id);
+            },
+            _ => {},
+        }
+
+        // direction ok, not been there before
+        let forward_path = self.split(next);
+
+        Route::new(&prevroute, next, forward_path)
     }
 
-    fn walk(&self, from: &Coord) -> Vec<Route> {
+    fn split(&self, from: &Coord) -> Vec<Route> {
         let Coord { x, y } = from;
+
         let above = Coord { x, y: y - 1 };
         let below = Coord { x, y: y + 1 };
         let left  = Coord { x: x - 1, y };
         let right = Coord { x: x + 1, y };
 
         let maybes = [
-            self.try_direction(&above),
-            self.try_direction(&below),
-            self.try_direction(&left),
-            self.try_direction(&right),
+            self.walk_direction(from, &above),
+            self.walk_direction(from, &below),
+            self.walk_direction(from, &left),
+            self.walk_direction(from, &right),
         ];
 
         for subroute in maybes {
             let subroute = match subroute {
-                Some(sr) => sr,
+                Some(x) => x,
                 None => continue,
             };
+
 
         }
     }
 
     fn possible_routes(&self) -> Vec<Route> {
-        let mut markedmap = HashMap::<Coord, Mark>::new();
-
-        /*
         for y in min.y..=max.y {
             for x in min.x..=max.x {
                 let c = Coord { x, y };
@@ -213,20 +240,22 @@ impl View {
                 }
             }
         }
-        */
+
         let mut robot_coord = None;
+        'outer:
         for y in min.y..=max.y {
             for x in min.x..=max.x {
                 match self.map.get(&Coord { x, y }) {
                     Some(Tile::Robot(_)) => {
                         robot_coord = Some(Coord { x, y });
+                        break 'outer;
                     },
                     _ => {},
                 }
             }
         }
 
-        self.walk(&robot_coord.expect("couldn't find robot"))
+        self.split(&robot_coord.expect("couldn't find robot"))
     }
 }
 
