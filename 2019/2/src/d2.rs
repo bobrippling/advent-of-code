@@ -8,6 +8,10 @@ impl Coord {
     fn new(x: isize, y: isize) -> Self {
         Self { x, y }
     }
+
+    fn zero() -> Self {
+        Self::new(0, 0)
+    }
 }
 
 #[derive(Clone, Copy)]
