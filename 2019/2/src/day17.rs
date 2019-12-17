@@ -5,7 +5,7 @@ use parse::bytes;
 
 mod lib;
 use lib::{IntCodeMachine, Word};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap/*, HashSet*/};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
 struct Coord {
@@ -40,18 +40,18 @@ enum Tile {
 
 struct View {
     map: HashMap<Coord, Tile>,
-    markedmap: HashMap<Coord, Mark>,
+    //markedmap: HashMap<Coord, Mark>,
 
     min: Coord,
     max: Coord,
-    nextid: usize,
+    //nextid: usize,
 }
 
-struct Mark {
+/*struct Mark {
     visited: HashSet<usize>,
-}
+}*/
 
-struct Route(Vec<Coord>);
+//struct Route(Vec<Coord>);
 
 impl Tile {
     fn from(ch: char) -> Self {
@@ -80,7 +80,7 @@ impl Tile {
     }
 }
 
-fn minmax(map: HashMap<Coord, Tile>) -> (Coord, Coord) {
+fn minmax(map: &HashMap<Coord, Tile>) -> (Coord, Coord) {
     map
         .keys()
         .fold(
@@ -168,6 +168,7 @@ impl View {
         overlaps
     }
 
+    /*
     fn walk_direction(
         &self,
         id: usize,
@@ -257,6 +258,7 @@ impl View {
 
         self.split(&robot_coord.expect("couldn't find robot"))
     }
+    */
 }
 
 impl std::fmt::Debug for View {
@@ -303,12 +305,44 @@ fn part2() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut machine = IntCodeMachine::new(&bytes, false);
 
-    let output = machine.interpret_async(&mut vec![]);
-    let view = View::parse(output);
+    let mut input = Vec::new();
 
-    let routes = view.possible_routes();
+    input.extend_from_slice(&[
+        'A' as Word,
+        ',' as Word,
+        'B' as Word,
+        ',' as Word,
+        'A' as Word,
+        ',' as Word,
+        'B' as Word,
+        ',' as Word,
+        'C' as Word,
+        ',' as Word,
+        'C' as Word,
+        ',' as Word,
+        'B' as Word,
+        ',' as Word,
+        'A' as Word,
+        ',' as Word,
+        'B' as Word,
+        ',' as Word,
+        'C' as Word,
+        '\n' as Word,
+    ]);
+    input.extend_from_slice(&[
+        'L' as Word, ',' as Word, '8' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '2' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '2' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '0' as Word, '\n' as Word,
+        'R' as Word, ',' as Word, '1' as Word, '0' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '2' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '0' as Word, '\n' as Word,
+        'L' as Word, ',' as Word, '1' as Word, '0' as Word, ',' as Word, 'R' as Word, ',' as Word, '1' as Word, '0' as Word, ',' as Word, 'L' as Word, ',' as Word, '6' as Word, '\n' as Word,
+        'n' as Word, '\n' as Word,
+    ]);
 
-    println!("{:?}", view);
+    let output = machine.interpret_async(&mut input);
+
+    //let view = View::parse(output);
+
+    //let routes = view.possible_routes();
+
+    println!("{:?}", output);
 
     Ok(())
 }
