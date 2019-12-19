@@ -5,11 +5,11 @@ pub struct Coord {
 }
 
 impl Coord {
-    fn new(x: isize, y: isize) -> Self {
+    pub fn new(x: isize, y: isize) -> Self {
         Self { x, y }
     }
 
-    fn zero() -> Self {
+    pub fn zero() -> Self {
         Self::new(0, 0)
     }
 }
