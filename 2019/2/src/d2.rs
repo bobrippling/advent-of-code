@@ -1,7 +1,7 @@
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Copy, Clone, Debug)]
 pub struct Coord {
-    x: isize,
-    y: isize,
+    pub x: isize,
+    pub y: isize,
 }
 
 impl Coord {

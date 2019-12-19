@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-mod d2;
-use d2::Coord;
+use crate::d2::Coord;
 
 #[derive(Default)]
 pub struct Grid<T> {
@@ -9,8 +8,15 @@ pub struct Grid<T> {
 }
 
 impl<T> Grid<T> {
-    fn minmax(&self) -> (Coord, Coord) {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn minmax(&self) -> (Coord, Coord) {
         self
+            .map
             .keys()
             .fold(
                 (Coord::zero(), Coord::zero()),
