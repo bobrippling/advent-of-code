@@ -8,7 +8,7 @@ pub fn bytes(path: &str) -> Result<Vec<Word>, Box<dyn std::error::Error>> {
     let s = fs::read_to_string(path)?;
     let v = s
         .trim_end()
-        .split(",")
+        .split(',')
         .map(str::parse)
         .collect::<
             Result<
