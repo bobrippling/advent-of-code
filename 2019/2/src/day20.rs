@@ -9,7 +9,7 @@ use grid::Grid;
 
 type GResult<T> = Result<T, Box<dyn std::error::Error>>;
 
-const DEBUG_WALK: bool = true;
+const DEBUG_WALK: bool = false;
 const DEBUG_EDGES: bool = false;
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ enum Tile {
     Empty,
     Wall,
     Path,
-    Teleport(String),
+    Teleport { name: String, is_outer: bool },
     Annotate(char),
 }
 
@@ -143,6 +143,44 @@ fn teleport_name(a: char, b: char) -> String {
     }
 }
 
+/*
+fn can_reach_edge_dir(grid: &Grid<char>, minmax: &(Coord, Coord), from: &Coord, dir: Compass) -> bool {
+    let mut c = *from;
+
+    while
+        minmax.0.x <= c.x && c.x <= minmax.1.x &&
+        minmax.0.y <= c.y && c.y <= minmax.1.y
+    {
+        c += dir;
+        match grid.map.get(&c) {
+            None => {},
+            Some(ch) => {
+                match ch {
+                    ' ' => {},
+                    _ => return false,
+                }
+            }
+        }
+    }
+
+    true
+}
+*/
+
+fn can_reach_edge_from(
+    from: &Coord,
+    (min, max): &(Coord, Coord),
+) -> bool {
+    /*return can_reach_edge_dir(grid, minmax, from, Compass::North)
+        || can_reach_edge_dir(grid, minmax, from, Compass::South)
+        || can_reach_edge_dir(grid, minmax, from, Compass::West)
+        || can_reach_edge_dir(grid, minmax, from, Compass::East);*/
+    from.x < min.x + 2 ||
+    from.x > max.x - 2 ||
+    from.y < min.y + 2 ||
+    from.y > max.y - 2
+}
+
 impl Map {
     fn read(path: &str) -> Self {
         let mut chgrid = Grid::new();
@@ -206,7 +244,9 @@ impl Map {
                         assert_eq!(candidates.len(), 1);
                         let teleport_coord = candidates[0];
 
-                        grid.map.insert(teleport_coord, Tile::Teleport(name.clone()));
+                        let is_outer = can_reach_edge_from(&coord, &(min, max));
+
+                        grid.map.insert(teleport_coord, Tile::Teleport { name: name.clone(), is_outer });
                         //println!("teleport {} @ {:?}", name, teleport_coord);
 
                         match teleports.get(&name) {
@@ -240,16 +280,19 @@ impl Map {
 
         for (name, (a, b)) in &teleports {
             if b.is_none() {
-                if a.is_some() {
-                    if entrance.is_none() {
-                        entrance = Some((name.clone(), a.unwrap()));
-                        continue;
+                match a {
+                    None => {},
+                    Some(a) => {
+                        if entrance.is_none() {
+                            entrance = Some((name.clone(), *a));
+                            continue;
+                        }
+                        if exit.is_none() {
+                            exit = Some((name.clone(), *a));
+                            continue;
+                        }
+                        panic!("no matching teleport for {}: got {:?} and {:?}", name, a, b);
                     }
-                    if exit.is_none() {
-                        exit = Some((name.clone(), a.unwrap()));
-                        continue;
-                    }
-                    panic!("no matching teleport for {}: got {:?} and {:?}", name, a, b);
                 }
             }
         }
@@ -273,7 +316,8 @@ fn show_map(map: &Map, custom: Option<fn(&Tile) -> String>) {
         Tile::Path => ".".into(),
         Tile::Wall => "#".into(),
         Tile::Empty => " ".into(),
-        Tile::Teleport(_) => "*".into(),
+        Tile::Teleport { is_outer: false, .. } => "*".into(),
+        Tile::Teleport { is_outer: true, .. } => "@".into(),
         Tile::Annotate(c) => format!("{}", c),
     });
 
@@ -305,7 +349,7 @@ fn reachable_from<'m, 'c>(map: &'m Map, coord: &'c Coord) -> HashSet<(&'m str, C
             &map.grid,
             &c,
             |tile| match tile {
-                Tile::Path | Tile::Teleport(_) => true,
+                Tile::Path | Tile::Teleport { .. } => true,
                 _ => false,
             });
 
@@ -327,7 +371,7 @@ fn reachable_from<'m, 'c>(map: &'m Map, coord: &'c Coord) -> HashSet<(&'m str, C
 
             match tile {
                 Tile::Path => todo.push((neighbour, dist + 1)),
-                Tile::Teleport(s) => {
+                Tile::Teleport { name: s, .. } => {
                     reachable.insert((&s, neighbour, dist + 1));
 
                     /*
