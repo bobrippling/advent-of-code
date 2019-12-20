@@ -333,7 +333,7 @@ fn show_map(map: &Map, custom: Option<fn(&Tile) -> String>) {
     }
 }
 
-fn reachable_from<'m, 'c>(map: &'m Map, coord: &'c Coord) -> HashSet<(&'m str, Coord, usize)> {
+fn reachable_from<'m, 'c>(map: &'m Map, cur_level: usize, level_change: bool, coord: &'c Coord) -> HashSet<(&'m str, Coord, usize)> {
     let mut reachable = HashSet::<(&'m str, Coord, usize)>::new();
 
     let mut visited = HashSet::<Coord>::new();
@@ -371,8 +371,10 @@ fn reachable_from<'m, 'c>(map: &'m Map, coord: &'c Coord) -> HashSet<(&'m str, C
 
             match tile {
                 Tile::Path => todo.push((neighbour, dist + 1)),
-                Tile::Teleport { name: s, .. } => {
-                    reachable.insert((&s, neighbour, dist + 1));
+                Tile::Teleport { name: s, is_outer } => {
+                    if can_use_teleport(level_change, *is_outer, cur_level, s) {
+                        reachable.insert((&s, neighbour, dist + 1));
+                    }
 
                     /*
                     let tele_coords = map.teleports.get(&s[..]).unwrap();
@@ -459,16 +461,49 @@ fn dijkstra<'m>(
     )
 }
 
-fn walk_map<'m>(map: &'m Map) -> Path<'m> {
+fn can_use_teleport(level_change: bool, is_outer: bool, level: usize, name: &str) -> bool {
+    if !level_change {
+        return true;
+    }
+
+    if !is_outer {
+        return true;
+    }
+
+    if name == "AA" || name == "ZZ" {
+        level == 0
+    } else {
+        true
+    }
+}
+
+fn walk_map<'m>(map: &'m Map, level_change: bool) -> Path<'m> {
     let mut edges = HashMap::<Edge<'m>, usize>::new();
 
     let mut visited = HashSet::<&str>::new();
 
-    let mut todo = Vec::<(&str, Coord)>::new();
-    todo.push((&map.entrance.0, map.entrance.1));
+    let mut todo = Vec::<(&str, Coord, usize)>::new();
+    todo.push((&map.entrance.0, map.entrance.1, 0));
 
     while !todo.is_empty() {
-        let (cur_name, cur_coord) = todo.pop().unwrap();
+        let (cur_name, cur_coord, cur_level) = todo.pop().unwrap();
+
+        let tile = map.grid.map.get(&cur_coord).unwrap();
+        let (enabled, level_dir): (bool, isize) = match tile {
+            Tile::Teleport { ref name, is_outer } => {
+                assert_eq!(name, cur_name);
+
+                if *is_outer {
+                    (can_use_teleport(level_change, *is_outer, cur_level, name), -1)
+                } else {
+                    (true, 1)
+                }
+            },
+            _ => panic!("not starting at label!?"),
+        };
+        if !enabled {
+            continue;
+        }
 
         if visited.contains(&cur_name[..]) {
             continue;
@@ -479,7 +514,7 @@ fn walk_map<'m>(map: &'m Map) -> Path<'m> {
             println!("reachable_from({:?}) // for {}", cur_coord, cur_name);
         }
 
-        let reachable = reachable_from(map, &cur_coord);
+        let reachable = reachable_from(map, cur_level, level_change, &cur_coord);
 
         for (to_name, to_coord, to_dist) in reachable {
             if cur_name != to_name {
@@ -495,16 +530,17 @@ fn walk_map<'m>(map: &'m Map) -> Path<'m> {
                 }
             }
 
-            todo.push((to_name, to_coord));
+            let new_level = ((cur_level as isize) + level_dir) as usize;
+            todo.push((to_name, to_coord, new_level));
 
             let tele_coords = map.teleports.get(&to_name[..]).unwrap();
             match tele_coords {
                 (Some(ref first), Some(ref second)) => {
                     if to_coord == *first {
-                        todo.push((to_name, *second));
+                        todo.push((to_name, *second, new_level));
                     } else {
                         assert_eq!(to_coord, *second);
-                        todo.push((to_name, *first));
+                        todo.push((to_name, *first, new_level));
                     }
                 },
                 (Some(ref first), None) => {
@@ -528,21 +564,21 @@ fn walk_map<'m>(map: &'m Map) -> Path<'m> {
     dijkstra(map, &edges)
 }
 
-fn eg(filename: &str, expected: usize) {
+fn eg(filename: &str, expected: usize, level_change: bool) {
     let map = Map::read(filename);
 
     println!("--- eg {} ---", filename);
     show_map(&map, None);
 
-    let path = walk_map(&map);
+    let path = walk_map(&map, level_change);
     println!("path: {:?}", path);
     assert_eq!(path.distance, expected);
     println!();
 }
 
 fn egs() {
-    eg("./eg1-day20", 23);
-    eg("./eg2-day20", 58);
+    eg("./eg1-day20", 23, false);
+    eg("./eg2-day20", 58, false);
 }
 
 fn part1() {
@@ -550,7 +586,7 @@ fn part1() {
 
     show_map(&map, None);
 
-    println!("{:?}", walk_map(&map));
+    println!("{:?}", walk_map(&map, false));
 }
 
 fn main() -> GResult<()> {
