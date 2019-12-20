@@ -15,7 +15,7 @@ impl Coord {
 }
 
 #[derive(Clone, Copy)]
-enum Compass {
+pub enum Compass {
     North,
     South,
     West,
