@@ -10,7 +10,8 @@ use grid::Grid;
 type GResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 const DEBUG_WALK: bool = false;
-const DEBUG_EDGES: bool = false;
+const DEBUG_WALK2: bool = true;
+const DEBUG_EDGES: bool = true;
 
 #[derive(Debug)]
 enum Tile {
@@ -333,6 +334,10 @@ fn show_map(map: &Map, custom: Option<fn(&Tile) -> String>) {
     }
 }
 
+fn inner_outer(b: bool) -> &'static str {
+    if b { "outer" } else { "inner" }
+}
+
 fn reachable_from<'m, 'c>(map: &'m Map, cur_level: usize, level_change: bool, coord: &'c Coord) -> HashSet<(&'m str, Coord, usize)> {
     let mut reachable = HashSet::<(&'m str, Coord, usize)>::new();
 
@@ -372,7 +377,17 @@ fn reachable_from<'m, 'c>(map: &'m Map, cur_level: usize, level_change: bool, co
             match tile {
                 Tile::Path => todo.push((neighbour, dist + 1)),
                 Tile::Teleport { name: s, is_outer } => {
-                    if can_use_teleport(level_change, *is_outer, cur_level, s) {
+                    let can_use = can_use_teleport(level_change, *is_outer, cur_level, s);
+
+                    if DEBUG_WALK2 {
+                        println!("  found {} ({}) - can use: {}, cur_level: {}",
+                            s,
+                            inner_outer(*is_outer),
+                            can_use,
+                            cur_level);
+                    }
+
+                    if can_use {
                         reachable.insert((&s, neighbour, dist + 1));
                     }
 
@@ -407,7 +422,7 @@ fn reachable_from<'m, 'c>(map: &'m Map, cur_level: usize, level_change: bool, co
 fn dijkstra<'m>(
     map: &'m Map,
     edges: &HashMap<Edge<'m>, usize>,
-) -> Path<'m> {
+) -> Option<Path<'m>> {
     let vertices = edges
         .keys()
         .flat_map(|Edge { from, to }| vec![from, to])
@@ -454,11 +469,13 @@ fn dijkstra<'m>(
         }
     }
 
-    Path::from(
-        &prev,
-        &map.exit.0[..],
-        distance[&map.exit.0[..]] - 1,
-    )
+    distance
+        .get(&map.exit.0[..])
+        .map(|d| Path::from(
+            &prev,
+            &map.exit.0[..],
+            d - 1,
+        ))
 }
 
 fn can_use_teleport(level_change: bool, is_outer: bool, level: usize, name: &str) -> bool {
@@ -470,17 +487,24 @@ fn can_use_teleport(level_change: bool, is_outer: bool, level: usize, name: &str
         return true;
     }
 
-    if name == "AA" || name == "ZZ" {
-        level == 0
+    if level == 0 {
+        name == "AA" || name == "ZZ"
     } else {
         true
     }
+    /*
+    if name == "AA" || name == "ZZ" {
+        level == 0
+    } else {
+        level != 0
+    }
+    */
 }
 
-fn walk_map<'m>(map: &'m Map, level_change: bool) -> Path<'m> {
+fn walk_map<'m>(map: &'m Map, level_change: bool) -> Option<Path<'m>> {
     let mut edges = HashMap::<Edge<'m>, usize>::new();
 
-    let mut visited = HashSet::<&str>::new();
+    let mut visited = HashSet::<(&str, usize)>::new();
 
     let mut todo = Vec::<(&str, Coord, usize)>::new();
     todo.push((&map.entrance.0, map.entrance.1, 0));
@@ -488,30 +512,28 @@ fn walk_map<'m>(map: &'m Map, level_change: bool) -> Path<'m> {
     while !todo.is_empty() {
         let (cur_name, cur_coord, cur_level) = todo.pop().unwrap();
 
+        if cur_level > 300 {
+            continue;
+        }
+
         let tile = map.grid.map.get(&cur_coord).unwrap();
-        let (enabled, level_dir): (bool, isize) = match tile {
+        // assume we can use this tile, since we've got it in our todo list
+        let is_outer = match tile {
             Tile::Teleport { ref name, is_outer } => {
                 assert_eq!(name, cur_name);
 
-                if *is_outer {
-                    (can_use_teleport(level_change, *is_outer, cur_level, name), -1)
-                } else {
-                    (true, 1)
-                }
+                *is_outer
             },
             _ => panic!("not starting at label!?"),
         };
-        if !enabled {
+
+        if visited.contains(&(&cur_name[..], cur_level)) {
             continue;
         }
+        visited.insert((&cur_name, cur_level));
 
-        if visited.contains(&cur_name[..]) {
-            continue;
-        }
-        visited.insert(&cur_name);
-
-        if DEBUG_WALK {
-            println!("reachable_from({:?}) // for {}", cur_coord, cur_name);
+        if DEBUG_WALK || DEBUG_WALK2 {
+            println!("reachable_from({:?}) // for {} ({}, level = {})", cur_coord, cur_name, inner_outer(is_outer), cur_level);
         }
 
         let reachable = reachable_from(map, cur_level, level_change, &cur_coord);
@@ -526,11 +548,25 @@ fn walk_map<'m>(map: &'m Map, level_change: bool) -> Path<'m> {
                 };
 
                 if should_insert {
+                    if DEBUG_WALK2 {
+                        println!("  adding to edges: {}", to_name);
+                    }
                     edges.insert(edge, to_dist);
                 }
             }
 
+            let to_tile = map.grid.map.get(&to_coord).unwrap();
+            let level_dir = match to_tile {
+                Tile::Teleport { is_outer, .. } => {
+                    if *is_outer { -1 } else { 1 }
+                },
+                _ => panic!("expected teleport"),
+            };
+
             let new_level = ((cur_level as isize) + level_dir) as usize;
+            if DEBUG_WALK2 {
+                println!("  adding to todo: {}, level {}", to_name, new_level);
+            }
             todo.push((to_name, to_coord, new_level));
 
             let tele_coords = map.teleports.get(&to_name[..]).unwrap();
@@ -572,13 +608,15 @@ fn eg(filename: &str, expected: usize, level_change: bool) {
 
     let path = walk_map(&map, level_change);
     println!("path: {:?}", path);
-    assert_eq!(path.distance, expected);
+    assert_eq!(path.unwrap().distance, expected);
     println!();
 }
 
 fn egs() {
-    eg("./eg1-day20", 23, false);
-    eg("./eg2-day20", 58, false);
+    //eg("eg1-day20", 23, false);
+    //eg("eg2-day20", 58, false);
+    eg("eg1-day20", 26, true);
+    eg("eg2-2-day20", 26, true);
 }
 
 fn part1() {
@@ -586,12 +624,21 @@ fn part1() {
 
     show_map(&map, None);
 
-    println!("{:?}", walk_map(&map, false));
+    println!("part1: {:?}", walk_map(&map, false));
+}
+
+fn part2() {
+    let map = Map::read("./input-day20");
+
+    show_map(&map, None);
+
+    println!("part2: {:?}", walk_map(&map, true));
 }
 
 fn main() -> GResult<()> {
     egs();
-    part1();
+    //part1();
+    //part2();
 
     Ok(())
 }
