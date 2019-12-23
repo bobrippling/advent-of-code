@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 mod lib;
 use lib::{IntCodeMachine, State, Word};
 
@@ -61,6 +63,7 @@ impl Nic {
             },
             State::Running => {
                 let output = self.machine.interpret_async(&mut input);
+                assert!(input.is_empty());
 
                 let mut packets = Vec::new();
                 assert!(output.len() % 3 == 0);
@@ -75,6 +78,10 @@ impl Nic {
             },
         }
     }
+
+    fn active(&self) -> bool {
+        !self.input_queue.is_empty()
+    }
 }
 
 fn part1() -> Result<(), Box<dyn std::error::Error>> {
@@ -87,24 +94,46 @@ fn part1() -> Result<(), Box<dyn std::error::Error>> {
         |addr| Nic::new(addr, &bytes)
     ).collect::<Vec<_>>();
 
+    let mut nat = Option::<Packet>::None;
+    let mut sent = HashSet::<Word>::new();
+
     'main: loop {
+        let mut active = false;
+
         for i in min..max {
-            let packets = nics[i as usize].run();
+            let nic = &mut nics[i as usize];
+            let packets = nic.run();
 
             if !packets.is_empty() {
-                println!("nic {}", i);
+                //println!("nic {}", i);
             }
 
+            active |= nic.active();
+
             for packet in packets {
-                println!("  packet {},{} --> {}", packet.x, packet.y, packet.addr);
+                //println!("  packet {},{} --> {}", packet.x, packet.y, packet.addr);
                 if min <= packet.addr && packet.addr < max {
                     nics[packet.addr as usize].input_queue.push(packet);
                 } else if packet.addr == 255 {
-                    println!("packet to addr 255: {:?}", packet);
-                    break 'main;
+                    nat = Some(packet);
                 }
             }
         }
+
+        match (active, nat.take()) {
+            (false, Some(packet)) => {
+                let Packet { y, .. } = packet;
+
+                if sent.contains(&y) {
+                    println!("found: {}", y);
+                    break;
+                }
+                sent.insert(y);
+
+                nics[0].input_queue.push(packet);
+            },
+            _ => {},
+        };
     }
 
     Ok(())
