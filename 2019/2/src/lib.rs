@@ -83,6 +83,13 @@ impl IntCodeMachine {
         self.state
     }
 
+    pub fn is_running(&self) -> bool {
+        match self.state() {
+            State::Running => true,
+            State::Halted => false,
+        }
+    }
+
     pub fn memory(&self) -> &[Word] {
         &self.mem
     }
