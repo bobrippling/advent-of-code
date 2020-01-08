@@ -171,11 +171,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     deck.apply(&shuffle);
 
+    /*
     println!(
         "cards 2017..2021: {:?}",
         &deck.cards[2017..2021]);
 
     // tried: 2070, 5064, 9083
+
+    println!("card 2019: {:?}", deck.cards[2019]);
+    */
+
+    println!("{:?}", deck.cards.iter().position(|&Card(x)| x == 2019));
 
     Ok(())
 }
