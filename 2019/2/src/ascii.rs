@@ -16,17 +16,23 @@ impl AsciiMachine {
         self.icm.is_running()
     }
 
-    pub fn run(&mut self, input: String) -> String {
+    pub fn run_intcode_output(&mut self, input: String) -> Vec<Word> {
         let mut inv: Vec<Word> = input
             .chars()
             .map(|c| c as _)
             .collect();
 
-        let out: Vec<Word> = self.icm.interpret_async(&mut inv);
-
-        out
-            .into_iter()
-            .map(|w| w as u8 as char)
-            .collect()
+        self.icm.interpret_async(&mut inv)
     }
+
+    pub fn run(&mut self, input: String) -> String {
+        to_string(&self.run_intcode_output(input))
+    }
+}
+
+pub fn to_string(ents: &[Word]) -> String {
+    ents
+        .iter()
+        .map(|&w| w as u8 as char)
+        .collect()
 }

@@ -42,18 +42,34 @@ fn part1() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = parse::bytes("./input-day21")?;
 
     let mut machine = AsciiMachine::new(&bytes);
-    let mut input = "".to_string();
+    let input = [
+        // jump if: gap @ 1, 2 or 3 and not at 4
+        "NOT A T",
+        "OR T J",
 
-    loop {
-        let out = machine.run(input);
-        print!("{}", out);
+        "NOT B T",
+        "OR T J",
 
-        if machine.is_running() {
-            input = line();
-        } else {
-            break;
-        }
-    }
+        "NOT C T",
+        "OR T J",
+
+        "AND D J",
+
+        "WALK",
+    ]
+        .iter()
+        .map(|&s| String::from(s) + "\n")
+        .collect::<Vec<_>>()
+        .join("");
+
+    let mut out = machine.run_intcode_output(input);
+    let last = out.pop().unwrap();
+    let s = ascii::to_string(&out);
+
+    println!("{}", s);
+    println!("final word: {}", last);
+
+    assert!(!machine.is_running());
 
     Ok(())
 }
