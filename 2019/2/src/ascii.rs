@@ -1,5 +1,6 @@
 use crate::lib::{IntCodeMachine, Word};
 
+#[derive(Clone)]
 pub struct AsciiMachine {
     icm: IntCodeMachine,
 }

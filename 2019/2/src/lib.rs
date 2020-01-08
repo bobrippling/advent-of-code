@@ -37,6 +37,7 @@ pub enum State {
     Halted,
 }
 
+#[derive(Clone)]
 pub struct IntCodeMachine {
     state: State,
 
