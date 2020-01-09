@@ -1,5 +1,6 @@
 use std::io;
 
+/*
 macro_rules! dist2reg {
     (1) => {"A"};
     (2) => {"B"};
@@ -10,19 +11,23 @@ macro_rules! dist2reg {
     (7) => {"G"};
     (8) => {"H"};
     (9) => {"I"};
+    ($n:expr) => {
+        ["A", "B", "C", "D", "E", "F", "G", "H", "I"][$n]
+    };
 }
 
 macro_rules! gap_at {
     ($n: literal) => {
-        stringify!("NOT ", $n, " T") //, "OR T, J"
+        concat!("NOT ", $n, " T") //, "OR T, J"
     }
 }
 
 macro_rules! tile_at {
     ($n: literal) => {
-        ("AND ", dist2reg!($n), " J")
+        concat!("AND ", dist2reg!($n), " J")
     }
 }
+*/
 
 mod parse;
 mod lib;
@@ -62,6 +67,29 @@ fn line() -> String {
     }
 }
 
+fn n2reg(n: usize) -> &'static str {
+    match n {
+        1 => "A",
+        2 => "B",
+        3 => "C",
+        4 => "D",
+        5 => "E",
+        6 => "F",
+        7 => "G",
+        8 => "H",
+        9 => "I",
+        _ => panic!(),
+    }
+}
+
+fn gap_at(n: usize) -> String {
+    format!("NOT {} T\nOR T J\n", n2reg(n)).into()
+}
+
+fn tile_at(n: usize) -> String {
+    format!("AND {} J\n", n2reg(n)).into()
+}
+
 fn part1() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = parse::bytes("./input-day21")?;
 
@@ -69,23 +97,25 @@ fn part1() -> Result<(), Box<dyn std::error::Error>> {
     let input = [
         // jump if: gap @ 1, 2 or 3 and not at 4
         //"NOT A T", "OR T J",
-        gap_at!(1),
+        gap_at(1),
 
         //"NOT B T", "OR T J",
-        gap_at!(2),
+        gap_at(2),
 
         //"NOT C T", "OR T J",
-        gap_at!(3),
+        gap_at(3),
 
         //"AND D J",
-        tile_at!(4),
+        tile_at(4),
 
-        "WALK",
+        "WALK\n".into(),
     ]
         .iter()
-        .map(|&s| String::from(s) + "\n")
-        .collect::<Vec<_>>()
+        .map(|s| &s[..])
+        .collect::<Vec<&str>>()
         .join("");
+
+    println!("input:\n{}", input);
 
     let mut out = machine.run_intcode_output(input);
     let last = out.pop().unwrap();
@@ -103,45 +133,49 @@ fn part2() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = parse::bytes("./input-day21")?;
 
     let mut machine = AsciiMachine::new(&bytes);
-    let input = [
+    let mut input = [
         // jump if:
         //   gap @ 1, 2 or 3 and not at 4 (first jump will succeed)
         // AND
         //   tile @ 5 and tile at 9
         //
-        gap_at!(1),
-        gap_at!(2),
-        gap_at!(3),
+        gap_at(1),
+        gap_at(2),
+        gap_at(3),
 
-        tile_at!(5),
-        tile_at!(9),
-        "NOT A T", "OR T J",
+        tile_at(5),
+        tile_at(9),
+        //"NOT A T", "OR T J",
 
-        "AND D J",
+        //"AND D J",
 
-        "RUN",
+        "RUN\n".into(),
     ]
         .iter()
-        .map(|&s| String::from(s) + "\n")
-        .collect::<Vec<_>>()
+        .map(|s| &s[..])
+        .collect::<Vec<&str>>()
         .join("");
 
-    let mut out = machine.run_intcode_output(input);
-    let last = out.pop().unwrap();
-    let s = ascii::to_string(&out);
+    loop {
+        println!("inut: {}", input);
+        let mut out = machine.run(input);
 
-    println!("{}", s);
-    println!("final word: {}", last);
+        println!("{}", out);
 
-    assert!(!machine.is_running());
+        if !machine.is_running() {
+            break;
+        }
+
+        input = line();
+    }
 
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //part1()?;
-    //part2()?;
-    println!("{}", tile_at!(2));
+    part2()?;
+    //println!("{}", tile_at!(2));
 
     Ok(())
 }
