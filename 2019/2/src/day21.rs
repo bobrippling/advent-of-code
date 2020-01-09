@@ -139,26 +139,87 @@ fn part2() -> Result<(), Box<dyn std::error::Error>> {
         // AND
         //   tile @ 5 and tile at 9
         //
-        gap_at(1),
-        gap_at(2),
-        gap_at(3),
+        // a = ground @ 1
+        // jump if: (!a|!b|!c) & d & (h | (e & i) | f) & (e & h)
+        //
 
-        tile_at(5),
-        tile_at(9),
-        //"NOT A T", "OR T J",
+        /*
+        "NOT A J",
 
-        //"AND D J",
+        "NOT B T",
+        "OR T J",
 
-        "RUN\n".into(),
+        "NOT C T",
+        "OR T J",
+
+        "AND D J",
+
+        // set T to true
+        "NOT H T",
+        "OR H T",
+
+        // (
+        "AND E T",
+        "AND I T",
+        "OR H T",
+        "OR F T",
+        // )
+
+        "AND T J",
+        */
+
+        /*
+        "NOT C J",
+        "AND D J",
+        "AND H J",
+
+        "NOT B T",
+        "AND D T",
+        "OR T J",
+
+        "NOT A T",
+        "OR T J",
+        */
+
+        "NOT A J",
+        "NOT B T",
+        "OR T J",
+        "NOT C T",
+        "AND H T",
+        "OR T J",
+        "AND D J",
+
+        "RUN".into(), // into not necessary
     ]
         .iter()
         .map(|s| &s[..])
         .collect::<Vec<&str>>()
-        .join("");
+        .join("\n");
+
+    input.push('\n');
+
+    println!("input:\n{}", input);
+
+    let mut out = machine.run_intcode_output(input);
+    let last = out.pop().unwrap();
+    let s = ascii::to_string(&out);
+
+    println!("{}", s);
+    println!("final word: {}", last);
+
+    assert!(!machine.is_running());
+
+    Ok(())
+}
+
+fn manual() -> Result<(), Box<dyn std::error::Error>> {
+    let bytes = parse::bytes("./input-day21")?;
+
+    let mut machine = AsciiMachine::new(&bytes);
+    let mut input = String::new();
 
     loop {
-        println!("inut: {}", input);
-        let mut out = machine.run(input);
+        let out = machine.run(input);
 
         println!("{}", out);
 
@@ -175,6 +236,7 @@ fn part2() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     //part1()?;
     part2()?;
+    //manual()?;
     //println!("{}", tile_at!(2));
 
     Ok(())
