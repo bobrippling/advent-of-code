@@ -1,5 +1,29 @@
 use std::io;
 
+macro_rules! dist2reg {
+    (1) => {"A"};
+    (2) => {"B"};
+    (3) => {"C"};
+    (4) => {"D"};
+    (5) => {"E"};
+    (6) => {"F"};
+    (7) => {"G"};
+    (8) => {"H"};
+    (9) => {"I"};
+}
+
+macro_rules! gap_at {
+    ($n: literal) => {
+        stringify!("NOT ", $n, " T") //, "OR T, J"
+    }
+}
+
+macro_rules! tile_at {
+    ($n: literal) => {
+        ("AND ", dist2reg!($n), " J")
+    }
+}
+
 mod parse;
 mod lib;
 mod ascii;
@@ -44,16 +68,17 @@ fn part1() -> Result<(), Box<dyn std::error::Error>> {
     let mut machine = AsciiMachine::new(&bytes);
     let input = [
         // jump if: gap @ 1, 2 or 3 and not at 4
-        "NOT A T",
-        "OR T J",
+        //"NOT A T", "OR T J",
+        gap_at!(1),
 
-        "NOT B T",
-        "OR T J",
+        //"NOT B T", "OR T J",
+        gap_at!(2),
 
-        "NOT C T",
-        "OR T J",
+        //"NOT C T", "OR T J",
+        gap_at!(3),
 
-        "AND D J",
+        //"AND D J",
+        tile_at!(4),
 
         "WALK",
     ]
@@ -74,8 +99,49 @@ fn part1() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn part2() -> Result<(), Box<dyn std::error::Error>> {
+    let bytes = parse::bytes("./input-day21")?;
+
+    let mut machine = AsciiMachine::new(&bytes);
+    let input = [
+        // jump if:
+        //   gap @ 1, 2 or 3 and not at 4 (first jump will succeed)
+        // AND
+        //   tile @ 5 and tile at 9
+        //
+        gap_at!(1),
+        gap_at!(2),
+        gap_at!(3),
+
+        tile_at!(5),
+        tile_at!(9),
+        "NOT A T", "OR T J",
+
+        "AND D J",
+
+        "RUN",
+    ]
+        .iter()
+        .map(|&s| String::from(s) + "\n")
+        .collect::<Vec<_>>()
+        .join("");
+
+    let mut out = machine.run_intcode_output(input);
+    let last = out.pop().unwrap();
+    let s = ascii::to_string(&out);
+
+    println!("{}", s);
+    println!("final word: {}", last);
+
+    assert!(!machine.is_running());
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    part1()?;
+    //part1()?;
+    //part2()?;
+    println!("{}", tile_at!(2));
 
     Ok(())
 }
