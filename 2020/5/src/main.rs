@@ -16,6 +16,38 @@ impl BoardingPass {
 impl FromStr for BoardingPass {
     type Err = ParseErr;
 
+    #[cfg(not(feature = "old-parsing"))]
+    fn from_str(s: &str) -> Result<BoardingPass, Self::Err> {
+        if s.len() != 10 {
+            return Err(ParseErr::InvalidStringLength);
+        }
+        if !s[0..=6].chars().all(|ch| ch == 'F' || ch == 'B') {
+            return Err(ParseErr::InvalidRowChars);
+        }
+        if !s[7..].chars().all(|ch| ch == 'L' || ch == 'R') {
+            return Err(ParseErr::InvalidColChars);
+        }
+
+        let n = s
+            .chars()
+            .rev()
+            .map(|ch| match ch {
+                'F' => 0,
+                'B' => 1,
+                'L' => 0,
+                'R' => 1,
+                _ => unreachable!(),
+            })
+            .enumerate()
+            .fold(0usize, |n, (i, bit)| n | (bit << (i)));
+
+        let row = (n >> 3) as u16;
+        let col = (n & 0b111) as u16;
+
+        Ok(BoardingPass { row, col })
+    }
+
+    #[cfg(feature = "old-parsing")]
     fn from_str(s: &str) -> Result<BoardingPass, Self::Err> {
         let mut row = 0;
         let mut col = 0;
@@ -53,8 +85,18 @@ impl FromStr for BoardingPass {
 
 #[derive(Debug, PartialEq, Eq)]
 enum ParseErr {
+    #[cfg(not(feature = "old-parsing"))]
+    InvalidStringLength,
+    #[cfg(not(feature = "old-parsing"))]
+    InvalidRowChars,
+    #[cfg(not(feature = "old-parsing"))]
+    InvalidColChars,
+    #[cfg(feature = "old-parsing")]
+
     InvalidChar(char),
+    #[cfg(feature = "old-parsing")]
     TooManyRows,
+    #[cfg(feature = "old-parsing")]
     TooManyCols,
 }
 
@@ -62,6 +104,14 @@ impl std::error::Error for ParseErr {}
 
 impl std::fmt::Display for ParseErr {
    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+       #[cfg(not(feature = "old-parsing"))]
+       match self {
+           Self::InvalidStringLength => write!(fmt, "Invalid boarding pass length"),
+           Self::InvalidRowChars => write!(fmt, "Invalid row characters"),
+           Self::InvalidColChars => write!(fmt, "Invalid column characters"),
+       }
+
+       #[cfg(feature = "old-parsing")]
        match self {
            Self::InvalidChar(ch) => write!(fmt, "Invalid char '{}'", ch),
            Self::TooManyRows => write!(fmt, "Too many rows"),
@@ -125,6 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let boarding_passes = s
         .split("\n")
+        .filter(|s| !s.is_empty())
         .map(str::parse)
         .collect::<Result<Vec<_>, _>>()?;
 
