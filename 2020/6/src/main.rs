@@ -18,7 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
 
-    let mut total_questions = 0;
+    let mut part1_total_questions = 0;
+    let mut part2_total_questions = 0;
+
     for group in groups {
         let mut count = HashMap::new();
         for person in group.iter() {
@@ -28,10 +30,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        total_questions += count.len();
+        part1_total_questions += count.len();
+        for &n in count.values() {
+            if n == group.len() {
+                part2_total_questions += 1;
+            }
+        }
     }
 
-    println!("{}", total_questions);
+    println!("Part 1: {}", part1_total_questions);
+    println!("Part 2: {}", part2_total_questions);
 
     Ok(())
 }
