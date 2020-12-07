@@ -91,8 +91,8 @@ enum ParseErr {
     InvalidRowChars,
     #[cfg(not(feature = "old-parsing"))]
     InvalidColChars,
-    #[cfg(feature = "old-parsing")]
 
+    #[cfg(feature = "old-parsing")]
     InvalidChar(char),
     #[cfg(feature = "old-parsing")]
     TooManyRows,
