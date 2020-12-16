@@ -1,0 +1,11 @@
+[package]
+name = "day16"
+version = "0.1.0"
+authors = ["Rob Pilling <robpilling@gmail.com>"]
+edition = "2018"
+
+[features]
+show-working = []
+
+[dependencies]
+regex = "1"
