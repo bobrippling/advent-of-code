@@ -50,6 +50,7 @@ fn contains_sum(window: &HashSet<N>, target: N) -> bool {
     false
 }
 
+#[cfg(test)]
 static EG: &[N] = &[
     35,
     20,

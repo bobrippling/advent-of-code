@@ -1,5 +1,6 @@
 use std::fs;
 use std::collections::HashMap;
+#[cfg(test)]
 use std::collections::HashSet;
 
 type Error = Box<dyn std::error::Error>;
