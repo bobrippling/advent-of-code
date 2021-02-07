@@ -169,6 +169,7 @@ fn parse_rule(s: &str) -> Rule {
             }
             let contents = &input[..=last];
 
+            // TODO: https://lib.rs/crates/peg / https://fasterthanli.me/series/advent-of-code-2020/part-7
             let n = match contents.parse::<usize>() {
                 Ok(n) => n,
                 Err(e) => {
