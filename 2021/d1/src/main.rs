@@ -1,7 +1,6 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = std::fs::read_to_string("input.txt")?
-        .split('\n')
-        .filter(|l| !l.is_empty())
+        .lines()
         .map(str::parse)
         .collect::<Result<Vec<u32>, _>>()?;
 
