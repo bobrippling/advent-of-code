@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+	"d1",
+	"d2",
+]
+
+[profile.release]
+overflow-checks = true
