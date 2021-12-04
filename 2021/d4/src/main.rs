@@ -130,21 +130,13 @@ impl Card {
             return true;
         }
 
-        self.cols().any(|col| col.iter().all(|(_, mark)| *mark))
+        self.cols().any(|mut col| col.all(|(_, mark)| mark))
     }
 
-    fn cols(&self) -> impl Iterator<Item = Vec<(u32, bool)>> + '_ {
+    fn cols(&self) -> impl Iterator<Item = impl Iterator<Item = (u32, bool)> + '_> + '_ {
         let n = self.rows[0].len();
 
-        (0..n).map(|col_index| {
-            let mut v = Vec::new();
-
-            for row in &self.rows {
-                v.push(row[col_index]);
-            }
-
-            v
-        })
+        (0..n).map(|col_index| self.rows.iter().map(move |row| row[col_index]))
     }
 }
 
