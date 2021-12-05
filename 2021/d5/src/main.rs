@@ -10,22 +10,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn part1(lines: &Lines) -> usize {
-    let grid = lines.to_grid();
+    let grid = lines.to_grid(Grid::HorzVertOnly);
 
-    grid.values()
-        .filter(|&&v| v >= 2)
-        .count()
+    grid.values().filter(|&&v| v >= 2).count()
 }
 
 fn part2(lines: &Lines) -> usize {
-    let grid = lines.to_grid_diagonal();
+    let grid = lines.to_grid(Grid::IncludeDiagonal);
 
-    grid.values()
-        .filter(|&&v| v >= 2)
-        .count()
+    grid.values().filter(|&&v| v >= 2).count()
 }
 
 struct Lines(Vec<(Pos, Pos)>);
+
+enum Grid {
+    HorzVertOnly,
+    IncludeDiagonal,
+}
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 struct Pos {
@@ -33,84 +34,24 @@ struct Pos {
     y: i32,
 }
 
-#[allow(dead_code)]
-fn print_grid(grid: &HashMap<Pos, i32>) {
-    let keys = grid.keys().collect::<Vec<_>>();
-
-    let x2 = keys.iter().map(|Pos { x, .. }| x).copied().max().unwrap();
-    let y2 = keys.iter().map(|Pos { y, .. }| y).copied().max().unwrap();
-
-    for y in 0..=y2 {
-        for x in 0..=x2 {
-            let pos = Pos {x ,y};
-            let v = grid.get(&pos).copied().unwrap_or(0);
-
-            let s = if v == 0 { '.'.into() } else { v.to_string() };
-
-            print!("{}", s)
-        }
-        println!();
-    }
-
-}
-
 impl Lines {
-    fn to_grid(&self) -> HashMap<Pos, i32> {
+    fn to_grid(&self, mode: Grid) -> HashMap<Pos, i32> {
         let mut grid = HashMap::new();
 
         for line in &self.0 {
-            let (a, b) = line;
-            if a.x != b.x && a.y != b.y {
-                continue;
-            }
+            let &(ref a, b) = line;
 
-            let min = a.min(b);
-            let max = a.max(b);
-
-            for x in min.x..=max.x {
-                for y in min.y..=max.y {
-                    let pos = Pos { x, y };
-                    *grid.entry(pos).or_insert(0) += 1;
-                }
-            }
-        }
-
-        grid
-    }
-
-    fn to_grid_diagonal(&self) -> HashMap<Pos, i32> {
-        let mut grid = HashMap::new();
-
-        for line in &self.0 {
-            let (a, b) = line;
-            // println!("doing {:?} to {:?}", a, b);
-
-            if a.x == b.x || a.y == b.y {
-                let min = a.min(b);
-                let max = a.max(b);
-
-                for x in min.x..=max.x {
-                    for y in min.y..=max.y {
-                        let pos = Pos { x, y };
-                        *grid.entry(pos).or_insert(0) += 1;
+            match mode {
+                Grid::HorzVertOnly => {
+                    if a.x != b.x && a.y != b.y {
+                        continue;
                     }
                 }
-            } else {
-                // diagonal
-                let start = *a;
-                let end = *b;
-                let dir_x = if start.x < end.x { 1 } else { -1 };
-                let dir_y = if start.y < end.y { 1 } else { -1 };
-                let mut pos = start;
+                Grid::IncludeDiagonal => {}
+            }
 
-                loop {
-                    *grid.entry(pos).or_insert(0) += 1;
-                    if pos == end {
-                        break;
-                    }
-                    pos.x += dir_x;
-                    pos.y += dir_y;
-                }
+            for pos in a.to(b) {
+                *grid.entry(pos).or_insert(0) += 1;
             }
         }
 
@@ -119,21 +60,58 @@ impl Lines {
 }
 
 impl Pos {
-    fn min(&self, other: &Self) -> Self {
-        Self {
-            x: self.x.min(other.x),
-            y: self.y.min(other.y),
-        }
-    }
+    fn to(mut self, target: Self) -> impl Iterator<Item = Pos> {
+        use std::{iter, ops};
 
-    fn max(&self, other: &Self) -> Self {
-        Self {
-            x: self.x.max(other.x),
-            y: self.y.max(other.y),
+        let dir = Dir::from(self, target);
+        let mut done = false;
+
+        return iter::from_fn(move || {
+            if done {
+                return None;
+            }
+            if self == target {
+                done = true;
+            }
+
+            let ret = self;
+            self += dir;
+            Some(ret)
+        });
+
+        #[derive(Clone, Copy)]
+        struct Dir {
+            x: i32,
+            y: i32,
+        }
+
+        impl Dir {
+            fn from(from: Pos, to: Pos) -> Self {
+                fn increment_for(from: i32, to: i32) -> i32 {
+                    use std::cmp::Ordering::*;
+
+                    match from.cmp(&to) {
+                        Less => 1,
+                        Equal => 0,
+                        Greater => -1,
+                    }
+                }
+
+                Self {
+                    x: increment_for(from.x, to.x),
+                    y: increment_for(from.y, to.y),
+                }
+            }
+        }
+
+        impl ops::AddAssign<Dir> for Pos {
+            fn add_assign(&mut self, dir: Dir) {
+                self.x += dir.x;
+                self.y += dir.y;
+            }
         }
     }
 }
-
 
 impl std::str::FromStr for Lines {
     type Err = &'static str;
@@ -157,16 +135,36 @@ impl std::str::FromStr for Pos {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-            if let [x, y] = s.split(',').collect::<Vec<_>>()[..] {
-                let invalid_num = |_| "invalid number";
+        if let [x, y] = s.split(',').collect::<Vec<_>>()[..] {
+            let invalid_num = |_| "invalid number";
 
-                let x = x.trim().parse().map_err(invalid_num)?;
-                let y = y.parse().map_err(invalid_num)?;
+            let x = x.trim().parse().map_err(invalid_num)?;
+            let y = y.parse().map_err(invalid_num)?;
 
-                Ok(Self { x, y })
-            } else {
-                Err("incorrect position format")
-            }
+            Ok(Self { x, y })
+        } else {
+            Err("incorrect position format")
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn print_grid(grid: &HashMap<Pos, i32>) {
+    let keys = grid.keys().collect::<Vec<_>>();
+
+    let x2 = keys.iter().map(|Pos { x, .. }| x).copied().max().unwrap();
+    let y2 = keys.iter().map(|Pos { y, .. }| y).copied().max().unwrap();
+
+    for y in 0..=y2 {
+        for x in 0..=x2 {
+            let pos = Pos { x, y };
+            let v = grid.get(&pos).copied().unwrap_or(0);
+
+            let s = if v == 0 { '.'.into() } else { v.to_string() };
+
+            print!("{}", s)
+        }
+        println!();
     }
 }
 
@@ -199,5 +197,22 @@ mod test {
         let lines = EG.parse().unwrap();
 
         assert_eq!(part2(&lines), 12);
+    }
+
+    #[test]
+    fn test_pos() {
+        let a = Pos { x: 1, y: 2 };
+        let b = Pos { x: 1, y: 5 };
+
+        let iter = a.to(b);
+        assert_eq!(
+            iter.collect::<Vec<_>>(),
+            vec![
+                Pos { x: 1, y: 2 },
+                Pos { x: 1, y: 3 },
+                Pos { x: 1, y: 4 },
+                Pos { x: 1, y: 5 },
+            ]
+        );
     }
 }
