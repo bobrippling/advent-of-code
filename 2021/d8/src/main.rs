@@ -1,9 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-#[derive(Debug)]
 struct Lines(Vec<Entry>);
 
-#[derive(Debug)]
 struct Entry {
     wire_combos: Vec<SevenSeg>,
     output: Vec<SevenSeg>,
@@ -23,10 +21,10 @@ fn part1(lines: &Lines) -> usize {
         .0
         .iter()
         .flat_map(|Entry { output, .. }| output)
-        .filter(|outputs| match outputs.on_count() {
+        .filter(|outputs| match outputs.segments_on() {
             // '1': 2
-            // '7': 3
             // '4': 4
+            // '7': 3
             // '8': 7
             2 | 3 | 4 | 7 => true,
             _ => false,
@@ -35,162 +33,163 @@ fn part1(lines: &Lines) -> usize {
 }
 
 fn part2(lines: &Lines) -> usize {
-    for Entry { wire_combos, .. } in &lines.0 {
-        let _mapping = solve_wiring(wire_combos);
-    }
+    lines
+        .0
+        .iter()
+        .map(|entry| {
+            let Entry {
+                wire_combos,
+                output,
+            } = entry;
 
-    todo!()
+            let solution = solve_wiring(wire_combos);
+
+            output
+                .iter()
+                .map(|seg| {
+                    solution
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .find(|&(_, encoded)| encoded == seg)
+                        .map(|(i, _)| i)
+                        .unwrap()
+                })
+                .fold(0, |acc, n| acc * 10 + n)
+        })
+        .sum()
 }
 
-fn solve_wiring(wire_combos: &Vec<SevenSeg>) -> HashMap<char, char> {
-    let mut wire_possibilities = HashMap::<char, HashSet<char>>::new();
-
-    let mut seen_targets = HashSet::new();
-
-    let mut eliminate_digit = |canonical_seg: &SevenSeg| {
-        let matching = wire_combos
+fn solve_wiring(wire_combos: &Vec<SevenSeg>) -> Vec<&SevenSeg> {
+    let find_with_count = |count| {
+        wire_combos
             .iter()
-            .filter(|input| input.on_count() == canonical_seg.on_count())
-            .collect::<Vec<_>>();
-
-        if let [target] = matching[..] {
-            println!(
-                "'{:?}' (target) matches '{:?}' (canon)",
-                target, canonical_seg
-            );
-
-            let canon_chars = canonical_seg.chars().collect();
-
-            for target_ch in target.chars() {
-                match wire_possibilities.get_mut(&target_ch) {
-                    Some(set) => {
-                        // it already exists, narrow down possibilities
-                        let narrowed = set.intersection(&canon_chars).copied().collect();
-                        *set = narrowed;
-
-                        println!(
-                            "  {} => {:?}    (narrowing down previous matches)",
-                            target_ch, *set
-                        );
-
-                        // *set = set.iter().copied().filter(|x| canon_chars.contains(x)).collect();
-                    }
-                    None => {
-                        // doesn't exist, create initial possibilities.
-                        let mut possibilities = canon_chars.clone();
-
-                        if !seen_targets.is_empty() {
-                            // we also exclude target chars we've already seen, since we can't map to them anyway
-                            possibilities =
-                                possibilities.difference(&seen_targets).copied().collect();
-                            println!(
-                                "  {} => {:?}    (already seen targets {:?})",
-                                target_ch, possibilities, seen_targets
-                            );
-                        } else {
-                            println!(
-                                "  {} => {:?}    (no targets seen so far)",
-                                target_ch, possibilities
-                            );
-                        }
-
-                        wire_possibilities.insert(target_ch, possibilities);
-                    }
-                };
-            }
-
-            for &ch in &canon_chars {
-                seen_targets.insert(ch);
-            }
-        } else {
-            panic!("expected a single match")
-        }
+            .find(|&seg| seg.segments_on() == count)
+            .unwrap()
     };
 
-    eliminate_digit(&SevenSeg::_1);
-    eliminate_digit(&SevenSeg::_4);
-    eliminate_digit(&SevenSeg::_7);
-    eliminate_digit(&SevenSeg::_8);
+    let one = find_with_count(SevenSeg::_1.segments_on());
+    let four = find_with_count(SevenSeg::_4.segments_on());
+    let seven = find_with_count(SevenSeg::_7.segments_on());
+    let eight = find_with_count(SevenSeg::_8.segments_on());
 
-    let remaining_lengths = [
-        &SevenSeg::_0,
-        // &SevenSeg::_1,
-        &SevenSeg::_2,
-        &SevenSeg::_3,
-        // &SevenSeg::_4,
-        &SevenSeg::_5,
-        &SevenSeg::_6,
-        // &SevenSeg::_7,
-        // &SevenSeg::_8,
-        &SevenSeg::_9,
-    ]
-    .iter()
-    .copied()
-    .map(SevenSeg::on_count)
-    .collect::<HashSet<_>>();
-
-    loop {
-        let done = wire_possibilities.values().all(|set| set.len() == 1);
-        if done {
-            break;
-        }
-
-        let (&ch, target) = wire_possibilities
+    fn find_matching<'a>(from: &HashSet<&'a SevenSeg>, seg: &SevenSeg) -> &'a SevenSeg {
+        let matches = from
             .iter()
-            .find(|(_, set)| set.len() == 1)
-            .expect("couldn't narrow down");
+            .copied()
+            .filter(|&candidate| (candidate & seg) == *seg)
+            .collect::<HashSet<_>>();
 
-        // find all the segments where both of these are on
-        let target_ch = *target.iter().next().unwrap();
+        assert_eq!(matches.len(), 1);
 
-        let candidates = SevenSeg::all()
-            .filter(|seg| seg.is_on(ch) && seg.is_on(target_ch))
-            .collect::<Vec<_>>();
-
-        println!("{} is {}", ch, target_ch);
-        println!("giving {} candidates", candidates.len());
-
-        todo!()
+        matches.iter().next().unwrap()
     }
 
-    wire_possibilities
-        .iter()
-        .map(|(k, set)| (*k, *set.iter().next().unwrap()))
-        .collect()
+    let nine = find_matching(
+        &wire_combos
+            .iter()
+            .filter(|&seg| seg != eight && seg != four)
+            .collect(),
+        &four,
+    );
+
+    let bd = four - one; // two leftmost segments of '4'
+
+    // segments with five on
+    let (two, three, five);
+    {
+        // 2, 3 and 5
+        let five_seg = wire_combos
+            .iter()
+            .filter(|seg| seg.segments_on() == 5)
+            .collect::<HashSet<_>>();
+
+        assert_eq!(five_seg.len(), 3);
+
+        three = find_matching(&five_seg, &one);
+        five = find_matching(&five_seg, &bd);
+
+        two = five_seg
+            .iter()
+            .copied()
+            .find(|&seg| seg != three && seg != five)
+            .unwrap();
+    }
+
+    // segments with six on
+    let (six, zero); // already got nine
+    {
+        let six_seg = wire_combos
+            .iter()
+            .filter(|seg| seg.segments_on() == 6)
+            .filter(|seg| seg != &nine)
+            .collect::<HashSet<_>>();
+
+        six = find_matching(&six_seg, &bd);
+        zero = six_seg
+            .iter()
+            .copied()
+            .find(|&seg| seg != six)
+            .unwrap();
+    }
+
+    vec![zero, one, two, three, four, five, six, seven, eight, nine]
 }
 
-#[derive(Default)]
+#[derive(Default, Hash, Eq, PartialEq, Clone)]
 struct SevenSeg([bool; 7]);
 
 impl SevenSeg {
     // count the number of on-bits
-    fn on_count(&self) -> u8 {
-        self.on_bits().count() as _
+    fn segments_on(&self) -> u8 {
+        self.bits_on().count() as _
     }
 
-    fn is_on(&self, ch: char) -> bool {
-        self.0[Self::char_to_index(ch).unwrap() as usize]
-    }
-
-    // // returns a bitmask,
-    // // e.g. if we have two on bits:
-    // //   '1' requires two on bits, so 1 << 1
-    // // e.g. if we have five on bits:
-    // //   '2', '3' and '5' require five bits, so (1 << 2 | 1 << 3 | 1 << 5)
-    // fn on_count_mask(&self) -> u8 {
-    //     self.on_bits()
-    //         .map(|i| 1 << i)
-    //         .reduce(std::ops::BitOr::bitor)
-    //         .unwrap()
-    // }
-
-    fn on_bits(&self) -> impl Iterator<Item = u8> + '_ {
+    fn bits_on(&self) -> impl Iterator<Item = u8> + '_ {
         self.0
             .iter()
             .copied()
             .enumerate()
             .filter(|(_, v)| *v)
             .map(|(i, _)| i as u8)
+    }
+}
+
+impl std::ops::BitAnd for &SevenSeg {
+    type Output = SevenSeg;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        let mut out = self.clone();
+        for (a, &b) in out.0.iter_mut().zip(rhs.0.iter()) {
+            *a &= b;
+        }
+        out
+    }
+}
+
+impl std::ops::Sub for &SevenSeg {
+    type Output = SevenSeg;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        let mut out = self.clone();
+        for (a, &b) in out.0.iter_mut().zip(rhs.0.iter()) {
+            if b {
+                *a = false;
+            }
+        }
+        out
+    }
+}
+
+impl std::ops::Not for &SevenSeg {
+    type Output = SevenSeg;
+
+    fn not(self) -> Self::Output {
+        let mut out = self.clone();
+        for x in &mut out.0 {
+            *x = !*x;
+        }
+        out
     }
 }
 
@@ -203,9 +202,9 @@ impl SevenSeg {
  *
  * 0: a b c   e f g (6)
  * 1:     c     f   (2)
- * 2: a   c d e g   (5)
+ * 2: a   c d e   g (5)
  * 3: a   c d   f g (5)
- * 4: b   c d   f   (4)
+ * 4:   b c d   f   (4)
  * 5: a b   d   f g (5)
  * 6: a b   d e f g (6)
  * 7: a   c     f   (3)
@@ -213,32 +212,18 @@ impl SevenSeg {
  * 9: a b c d   f g (6)
  */
 impl SevenSeg {
-    const _0: Self = Self([true, true, true, false, true, true, true]); // a b c e f g
-    const _1: Self = Self([false, false, true, false, false, true, false]); // c f
-    const _2: Self = Self([true, false, true, true, true, false, true]); // a c d e g
-    const _3: Self = Self([true, false, true, true, false, true, true]); // a c d f g
-    const _4: Self = Self([false, true, true, true, false, true, false]); // b c d f
-    const _5: Self = Self([true, true, false, true, false, true, true]); // a b d f g
-    const _6: Self = Self([true, true, false, true, true, true, true]); // a b d e f g
-    const _7: Self = Self([true, false, true, false, false, true, false]); // a c f
-    const _8: Self = Self([true, true, true, true, true, true, true]); // a b c d e f g
-    const _9: Self = Self([true, true, true, true, false, true, true]); // a b c d f g
+    #![allow(unused_variables)]
 
-    fn all() -> impl Iterator<Item = &'static SevenSeg> {
-        [
-            Self::_0,
-            Self::_1,
-            Self::_2,
-            Self::_3,
-            Self::_4,
-            Self::_5,
-            Self::_6,
-            Self::_7,
-            Self::_8,
-            Self::_9,
-        ]
-        .iter()
-    }
+    const _0: Self = Self([true, true, true, false, true, true, true]);
+    const _1: Self = Self([false, false, true, false, false, true, false]);
+    const _2: Self = Self([true, false, true, true, true, false, true]);
+    const _3: Self = Self([true, false, true, true, false, true, true]);
+    const _4: Self = Self([false, true, true, true, false, true, false]);
+    const _5: Self = Self([true, true, false, true, false, true, true]);
+    const _6: Self = Self([true, true, false, true, true, true, true]);
+    const _7: Self = Self([true, false, true, false, false, true, false]);
+    const _8: Self = Self([true, true, true, true, true, true, true]);
+    const _9: Self = Self([true, true, true, true, false, true, true]);
 }
 
 impl std::fmt::Debug for SevenSeg {
@@ -291,26 +276,6 @@ impl SevenSeg {
             _ => return None,
         })
     }
-
-    fn index_to_char(i: usize) -> Option<char> {
-        Some(match i {
-            0 => 'a',
-            1 => 'b',
-            2 => 'c',
-            3 => 'd',
-            4 => 'e',
-            5 => 'f',
-            6 => 'g',
-            _ => return None,
-        })
-    }
-
-    fn chars(&self) -> impl Iterator<Item = char> + '_ {
-        self.on_bits()
-            .map(|b| b as usize)
-            .map(Self::index_to_char)
-            .map(Option::unwrap)
-    }
 }
 
 impl std::str::FromStr for SevenSeg {
@@ -349,7 +314,6 @@ mod test {
     #[test]
     fn test_part1() {
         let lines = EG.parse().unwrap();
-        println!("Parsed: {:?}", lines);
         assert_eq!(part1(&lines), 26);
     }
 
