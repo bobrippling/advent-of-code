@@ -111,7 +111,7 @@ impl<'cave> Path<'cave> {
     fn has_double_visit(&self) -> bool {
         let mut caves = HashSet::new();
 
-        for &cave in self.steps.iter().filter(|c| !c.is_big()) {
+        for cave in self.steps.iter().filter(|c| c.is_small()) {
             if caves.contains(cave) {
                 return true;
             }
@@ -143,6 +143,10 @@ impl Cave {
 
     fn is_big(&self) -> bool {
         self.0.chars().next().unwrap().is_ascii_uppercase()
+    }
+
+    fn is_small(&self) -> bool {
+        !self.is_big()
     }
 }
 
