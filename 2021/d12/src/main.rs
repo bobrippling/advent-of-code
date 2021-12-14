@@ -169,7 +169,7 @@ impl std::str::FromStr for Caves {
                 let to = edges.entry(b).or_default();
                 to.insert(a);
             } else {
-                panic!("couldn't split '{}'", l);
+                return Err("couldn't split on '-'");
             }
         }
 
