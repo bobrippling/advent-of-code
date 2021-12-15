@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-#[cfg(test)]
-use std::collections::HashSet;
+
+#[cfg(test)] // or debug
+use std::collections::HashSet; // debug: io::Write;
 
 use pathfinding::prelude::dijkstra;
 
@@ -15,6 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 struct Map {
     points: HashMap<Pos, u32>,
+    width: u32,
+    height: u32,
 }
 
 fn part1(map: &Map) -> u32 {
@@ -36,26 +39,27 @@ fn part1(map: &Map) -> u32 {
 }
 
 fn part2(map: &Map) -> u32 {
-    let max = map.max();
-    let end = Pos {
-        x: max.x * 5,
-        y: max.y * 5,
+    let end = {
+        let max = map.max();
+        Pos {
+            x: max.x * 5,
+            y: max.y * 5,
+        }
     };
 
     let cost_five = |pos: &Pos| {
         if pos.x == 0 || pos.y == 0 {
             return None;
         }
+        assert!(pos.x > 0 && pos.y > 0);
         if pos.x > end.x || pos.y > end.y {
             return None;
         }
 
-        let (source, remainder) = pos.div();
-
+        let (source, remainder) = pos.div(map.width as i32, map.height as i32);
         let &source_cost = map.points.get(&source).unwrap();
-
-        let cost = wrap(source_cost + (remainder.x + remainder.y) as u32);
-
+        let offset = (remainder.x + remainder.y) as u32;
+        let cost = wrap(source_cost + offset);
         Some(cost)
     };
 
@@ -85,6 +89,9 @@ fn part2(map: &Map) -> u32 {
     {
         let pathpoints: HashSet<_> = path.0.into_iter().collect();
 
+        // debug
+        // let mut out = std::fs::File::create("map.txt").unwrap();
+
         for y in 1..=end.y {
             for x in 1..=end.x {
                 let pos = Pos { x, y };
@@ -110,10 +117,10 @@ fn wrap(cost: u32) -> u32 {
     (cost - 1) % 9 + 1
 }
 
-fn div(mut i: i32) -> (i32, i32) {
+fn div(mut i: i32, by: i32) -> (i32, i32) {
     let mut n = 0;
-    while i > 10 {
-        i -= 10;
+    while i > by {
+        i -= by;
         n += 1;
     }
     (i, n)
@@ -179,9 +186,9 @@ impl Pos {
         .into_iter()
     }
 
-    fn div(&self) -> (Self, Self) {
-        let x = div(self.x);
-        let y = div(self.y);
+    fn div(&self, w: i32, h: i32) -> (Self, Self) {
+        let x = div(self.x, w);
+        let y = div(self.y, h);
 
         (Self { x: x.0, y: y.0 }, Self { x: x.1, y: y.1 })
     }
@@ -193,7 +200,11 @@ impl std::str::FromStr for Map {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut points = HashMap::new();
 
+        let height = s.lines().count() as _;
+        let width: u32 = s.lines().next().unwrap().trim().chars().count() as _;
+
         for (y, l) in s.lines().enumerate() {
+            assert_eq!(l.trim().bytes().count() as u32, width);
             for (x, ch) in l.trim().bytes().enumerate() {
                 let ch = ch as u32 - '0' as u32;
                 let pos = Pos {
@@ -205,7 +216,11 @@ impl std::str::FromStr for Map {
             }
         }
 
-        Ok(Self { points })
+        Ok(Self {
+            points,
+            width,
+            height,
+        })
     }
 }
 
@@ -247,19 +262,18 @@ mod test {
 
     #[test]
     fn test_div() {
-        assert_eq!(div(1), (1, 0));
-        assert_eq!(div(9), (9, 0));
-        assert_eq!(div(10), (10, 0));
-        assert_eq!(div(11), (1, 1));
-        assert_eq!(div(19), (9, 1));
-        assert_eq!(div(20), (10, 1));
-        assert_eq!(div(21), (1, 2));
+        assert_eq!(div(1, 10), (1, 0));
+        assert_eq!(div(9, 10), (9, 0));
+        assert_eq!(div(10, 10), (10, 0));
+        assert_eq!(div(11, 10), (1, 1));
+        assert_eq!(div(19, 10), (9, 1));
+        assert_eq!(div(20, 10), (10, 1));
+        assert_eq!(div(21, 10), (1, 2));
     }
 
     #[test]
     fn test_part2() {
         let lines = EG.parse().unwrap();
         assert_eq!(part2(&lines), 315);
-        assert!(false);
     }
 }
