@@ -1,13 +1,13 @@
 use itertools::Itertools;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let lines = std::fs::read_to_string("input.txt")?
+    let numbers = std::fs::read_to_string("input.txt")?
         .lines()
         .map(str::parse)
         .collect::<Result<Vec<_>, _>>()?;
 
-    println!("Part 1: {}", part1(&lines));
-    println!("Part 2: {}", part2(&lines));
+    println!("Part 1: {}", part1(&numbers));
+    println!("Part 2: {}", part2(&numbers));
 
     Ok(())
 }
@@ -15,30 +15,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Eq, PartialEq, Clone)]
 enum Number {
     N(i64),
-    Box(Box<Number>, Box<Number>),
+    Pair(Box<Number>, Box<Number>),
 }
 
-fn part1(input: &[Number]) -> i64 {
-    let total: Number = input.into_iter().cloned().sum();
-
-    total.magnitude()
+fn part1(numbers: &[Number]) -> i64 {
+    numbers.into_iter().cloned().sum::<Number>().magnitude()
 }
 
-fn part2(input: &[Number]) -> i64 {
-    input.iter().permutations(2).map(|pair| {
-        if let [a, b] = pair[..] {
-            (a.clone() + b.clone()).magnitude()
-        } else {
-            panic!()
-        }
-    }).max().unwrap()
+fn part2(numbers: &[Number]) -> i64 {
+    numbers
+        .iter()
+        .permutations(2)
+        .map(|pair| {
+            if let [a, b] = pair[..] {
+                (a.clone() + b.clone()).magnitude()
+            } else {
+                unreachable!()
+            }
+        })
+        .max()
+        .unwrap()
 }
 
 impl std::ops::Add for Number {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut r = Self::Box(Box::new(self), Box::new(rhs));
+        let mut r = Self::Pair(Box::new(self), Box::new(rhs));
         r.reduce();
         r
     }
@@ -46,23 +49,18 @@ impl std::ops::Add for Number {
 
 impl std::iter::Sum for Number {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(|acc, n| {
-            acc + n
-        }).unwrap_or_default()
+        iter.reduce(|acc, n| acc + n).unwrap_or_default()
     }
 }
 
 impl Default for Number {
     fn default() -> Self {
-        Self::N(0)
+        Self::N(Default::default())
     }
 }
 
 impl Number {
     fn reduce(&mut self) {
-        // nest depth of 4 --> explode
-        // n >= 10 --> split
-
         loop {
             while self.explode(0).is_some() {}
 
@@ -76,9 +74,6 @@ impl Number {
     fn explode(&mut self, depth: u32) -> Option<(Option<i64>, Option<i64>)> {
         assert!(depth < 5);
         if depth == 4 {
-            // [[[[ [9,8],1],2],3],4]
-            // [[[[   0  ,9],2],3],4]
-
             match self.take_box() {
                 Some((a, b)) => Some((Some(a), Some(b))),
                 None => None,
@@ -86,27 +81,27 @@ impl Number {
         } else {
             match self {
                 Self::N(_) => None,
-                Self::Box(a, b) => {
-                    match a.explode(depth + 1) {
-                        Some((apply_a, Some(apply_b))) => {
-                            let apply_b = if b.add_left(apply_b) {
+                Self::Pair(lhs, rhs) => {
+                    match lhs.explode(depth + 1) {
+                        Some((from_lhs, Some(from_rhs))) => {
+                            let from_rhs = if rhs.add_left(from_rhs) {
                                 None
                             } else {
-                                Some(apply_b)
+                                Some(from_rhs)
                             };
-                            return Some((apply_a, apply_b));
+                            return Some((from_lhs, from_rhs));
                         }
                         r @ Some(_) => return r,
                         None => {}
                     }
-                    match b.explode(depth + 1) {
-                        Some((Some(apply_a), apply_b)) => {
-                            let apply_a = if a.add_right(apply_a) {
+                    match rhs.explode(depth + 1) {
+                        Some((Some(from_lhs), from_rhs)) => {
+                            let from_lhs = if lhs.add_right(from_lhs) {
                                 None
                             } else {
-                                Some(apply_a)
+                                Some(from_lhs)
                             };
-                            return Some((apply_a, apply_b));
+                            return Some((from_lhs, from_rhs));
                         }
                         r @ Some(_) => return r,
                         None => {}
@@ -119,10 +114,8 @@ impl Number {
 
     fn magnitude(&self) -> i64 {
         match self {
-            Self::N(n) => *n,
-            Self::Box(a, b) => {
-                3 * a.magnitude() + 2 * b.magnitude()
-            }
+            &Self::N(n) => n,
+            Self::Pair(a, b) => 3 * a.magnitude() + 2 * b.magnitude(),
         }
     }
 
@@ -132,9 +125,9 @@ impl Number {
                 *self = Self::N(n);
                 None
             }
-            Self::Box(a, b) => Some(match (*a, *b) {
+            Self::Pair(a, b) => Some(match (*a, *b) {
                 (Self::N(a), Self::N(b)) => (a, b),
-                _ => panic!("4-deep, not pair[n, n]"),
+                _ => panic!("4-deep, expected Pair / [a, b]"),
             }),
         }
     }
@@ -145,7 +138,7 @@ impl Number {
                 *x += n;
                 true
             }
-            Self::Box(a, _) => a.add_left(n),
+            Self::Pair(l, _) => l.add_left(n),
         }
     }
 
@@ -155,7 +148,7 @@ impl Number {
                 *x += n;
                 true
             }
-            Self::Box(_, b) => b.add_right(n),
+            Self::Pair(_, r) => r.add_right(n),
         }
     }
 
@@ -165,11 +158,11 @@ impl Number {
                 let a = n / 2;
                 let b = (n + 1) / 2;
 
-                *self = Self::Box(Box::new(Number::N(a)), Box::new(Number::N(b)));
+                *self = Self::Pair(Box::new(Number::N(a)), Box::new(Number::N(b)));
                 true
             }
             Self::N(_) => false,
-            Self::Box(ref mut a, ref mut b) => a.split() || b.split(),
+            Self::Pair(ref mut a, ref mut b) => a.split() || b.split(),
         }
     }
 }
@@ -180,41 +173,49 @@ impl std::str::FromStr for Number {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let chars = s.bytes().collect::<Vec<_>>();
 
-        let (n, rest) = parse_num(&chars).unwrap();
-        assert!(rest.len() == 0);
-        Ok(n)
+        let (n, rest) = Number::parse(&chars).map_err(|_| "couldn't parse")?;
+
+        if rest.len() == 0 {
+            Ok(n)
+        } else {
+            Err("leftover chars")
+        }
     }
 }
 
-fn parse_num(chars: &[u8]) -> Option<(Number, &[u8])> {
-    if chars[0] == b'[' {
-        let (a, rest) = parse_num(&chars[1..]).unwrap();
-        assert!(rest[0] == b',');
-        let (b, rest) = parse_num(&rest[1..]).unwrap();
-        assert!(rest[0] == b']');
+impl Number {
+    fn parse(chars: &[u8]) -> Result<(Number, &[u8]), &'static str> {
+        if chars[0] == b'[' {
+            let (lhs, rest) = Number::parse(&chars[1..])?;
 
-        Some((Number::Box(Box::new(a), Box::new(b)), &rest[1..]))
-    } else {
-        let last_i = chars
-            .iter()
-            .enumerate()
-            .take_while(|(_, ch)| ch.is_ascii_digit())
-            .map(|(i, _)| i)
-            .last()
-            .unwrap();
-        let s = chars[..=last_i]
-            .iter()
-            .map(|&b| b as char)
-            .collect::<String>();
-        let n = s.parse().unwrap();
+            if rest[0] != b',' {
+                return Err("expected comma");
+            }
 
-        Some((Number::N(n), &chars[last_i + 1..]))
-    }
-}
+            let (rhs, rest) = Number::parse(&rest[1..])?;
+            if rest[0] != b']' {
+                return Err("expected close paren");
+            }
 
-impl std::fmt::Debug for Number {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+            Ok((Number::Pair(Box::new(lhs), Box::new(rhs)), &rest[1..]))
+        } else {
+            let last_i = chars
+                .iter()
+                .enumerate()
+                .take_while(|(_, ch)| ch.is_ascii_digit())
+                .map(|(i, _)| i)
+                .last()
+                .ok_or("digits expected")?;
+
+            let n = chars[..=last_i]
+                .iter()
+                .map(|&rhs| rhs as char)
+                .collect::<String>()
+                .parse()
+                .expect("couldn't parse digits?");
+
+            Ok((Number::N(n), &chars[last_i + 1..]))
+        }
     }
 }
 
@@ -224,8 +225,14 @@ impl std::fmt::Display for Number {
 
         match self {
             N(n) => write!(f, "{}", n),
-            Box(a, b) => write!(f, "[{}, {}]", a, b),
+            Pair(a, b) => write!(f, "[{}, {}]", a, b),
         }
+    }
+}
+
+impl std::fmt::Debug for Number {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -233,24 +240,24 @@ impl std::fmt::Display for Number {
 mod test {
     use super::*;
 
-    fn new_num(a: Number, b: Number) -> Number {
-        Number::Box(Box::new(a), Box::new(b))
-    }
-
-    fn new_pair(a: i64, b: i64) -> Number {
-        Number::Box(Box::new(Number::N(a)), Box::new(Number::N(b)))
-    }
-
     #[test]
     fn test_parse() {
+        fn nest(a: Number, b: Number) -> Number {
+            Number::Pair(Box::new(a), Box::new(b))
+        }
+
+        fn pair(a: i64, b: i64) -> Number {
+            Number::Pair(Box::new(Number::N(a)), Box::new(Number::N(b)))
+        }
+
         let s = "[[[[1,2],[3,4]],[[5,6],[7,8]]],9]";
         let n: Number = s.parse().unwrap();
         assert_eq!(
             n,
-            new_num(
-                new_num(
-                    new_num(new_pair(1, 2), new_pair(3, 4),),
-                    new_num(new_pair(5, 6), new_pair(7, 8),),
+            nest(
+                nest(
+                    nest(pair(1, 2), pair(3, 4)),
+                    nest(pair(5, 6), pair(7, 8)),
                 ),
                 Number::N(9),
             ),
@@ -321,10 +328,15 @@ mod test {
         ";
         let res = "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]";
 
-        let nums: Vec<Number> = nums.lines().map(str::trim).map(str::parse).collect::<Result<_, _>>().unwrap();
+        let nums: Vec<Number> = nums
+            .lines()
+            .map(str::trim)
+            .map(str::parse)
+            .collect::<Result<_, _>>()
+            .unwrap();
         let res: Number = res.parse().unwrap();
 
-        assert_eq!( nums.into_iter().sum::<Number>(), res);
+        assert_eq!(nums.into_iter().sum::<Number>(), res);
     }
 
     #[test]
@@ -340,7 +352,9 @@ mod test {
         assert_mag("[[[[1,1],[2,2]],[3,3]],[4,4]]", 445);
         assert_mag("[[[[3,0],[5,3]],[4,4]],[5,5]]", 791);
         assert_mag("[[[[5,0],[7,4]],[5,5]],[6,6]]", 1137);
-        assert_mag("[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]", 3488);
-
+        assert_mag(
+            "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]",
+            3488,
+        );
     }
 }
