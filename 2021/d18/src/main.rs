@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lines = std::fs::read_to_string("input.txt")?
         .lines()
@@ -5,7 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect::<Result<Vec<_>, _>>()?;
 
     println!("Part 1: {}", part1(&lines));
-    // println!("Part 2: {}", part2(&lines));
+    println!("Part 2: {}", part2(&lines));
 
     Ok(())
 }
@@ -20,6 +22,16 @@ fn part1(input: &[Number]) -> i64 {
     let total: Number = input.into_iter().cloned().sum();
 
     total.magnitude()
+}
+
+fn part2(input: &[Number]) -> i64 {
+    input.iter().permutations(2).map(|pair| {
+        if let [a, b] = pair[..] {
+            (a.clone() + b.clone()).magnitude()
+        } else {
+            panic!()
+        }
+    }).max().unwrap()
 }
 
 impl std::ops::Add for Number {
