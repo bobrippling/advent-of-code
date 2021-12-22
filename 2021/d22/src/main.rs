@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -60,12 +60,12 @@ fn part1(input: &Input) -> u64 {
     cubes.len() as u64
 }
 
-fn part2(input: &Input) -> u64 {
+fn part2(input: &Input) -> i64 {
     fast(input, false)
 }
 
-fn fast(input: &Input, skip_50: bool) -> u64 {
-    let mut cubes = HashSet::<Range3>::new();
+fn fast(input: &Input, skip_50: bool) -> i64 {
+    let mut cubes = HashMap::<Range3, i64>::new();
 
     for ins in &input.instructions {
         let &(on, ref cube) = ins;
@@ -74,42 +74,29 @@ fn fast(input: &Input, skip_50: bool) -> u64 {
             continue;
         }
 
-        let mut to_remove = HashSet::new();
-        let mut to_add = HashSet::new();
+        let mut additions = HashMap::<_, i64>::new();
 
-        if cubes.is_empty() {
-            if on {
-                cubes.insert(cube.clone());
-            } else {
-                panic!("turning off nothing?");
-            }
-        } else {
-            for cube in &cubes {
-                if let Some((overlap, orig_parts, new_parts)) = cube.split_with(cube) {
-                    to_remove.insert(cube.clone());
+        for (existing_cube, &existing_modifier) in &cubes {
+            let overlap = existing_cube.overlap(cube);
 
-                    if on {
-                        to_add.insert(overlap);
-                        to_add.extend(orig_parts);
-                        to_add.extend(new_parts);
-                    } else {
-                        to_add.extend(orig_parts);
-                    }
-                }
+            if !overlap.is_empty() {
+                *additions.entry(overlap.clone()).or_default() -= existing_modifier;
             }
         }
 
-        for cube in to_remove {
-            cubes.remove(&cube);
+        if on {
+            *additions.entry(cube.clone()).or_default() += 1;
         }
-        for cube in to_add {
-            cubes.insert(cube);
+
+        for (cube, modifier) in additions {
+            *cubes.entry(cube).or_default() += modifier;
         }
     }
 
-    cubes.into_iter().fold(0, |acc, cube| {
-        acc + cube.magnitude()
-    })
+    cubes
+        .into_iter()
+        .map(|(cube, modifier)| cube.magnitude() * modifier)
+        .sum()
 }
 
 impl Range3 {
@@ -122,114 +109,20 @@ impl Range3 {
             && *self.z.end() <= 50
     }
 
-    fn magnitude(self) -> u64 {
-        (self.x.count() * self.y.count() * self.z.count()) as _
+    fn magnitude(self) -> i64 {
+        (self.x.count() * self.y.count() * self.z.count()).try_into().unwrap()
     }
 
-    fn split_with(
-        &self,
-        subtract: &Self,
-    ) -> Option<(Self, impl Iterator<Item = Self>, impl Iterator<Item = Self>)> {
-        let overlap = Self {
-            x: inside(&self.x, &subtract.x),
-            y: inside(&self.y, &subtract.y),
-            z: inside(&self.z, &subtract.z),
-        };
-
-        if overlap.is_empty() {
-            return None;
+    fn overlap(&self, other: &Self) -> Self {
+        Self {
+            x: *self.x.start().max(other.x.start())..=*self.x.end().min(other.x.end()),
+            y: *self.y.start().max(other.y.start())..=*self.y.end().min(other.y.end()),
+            z: *self.z.start().max(other.z.start())..=*self.z.end().min(other.z.end()),
         }
-
-        let orig_parts = vec![
-            Self {
-                x: outside(&self.x, &subtract.x),
-                y: outside(&self.y, &subtract.y),
-                z: outside(&self.z, &subtract.z),
-            },
-            Self {
-                x: outside(&self.x, &subtract.x),
-                y: inside(&self.y, &subtract.y),
-                z: outside(&self.z, &subtract.z),
-            },
-            Self {
-                x: inside(&self.x, &subtract.x),
-                y: outside(&self.y, &subtract.y),
-                z: outside(&self.z, &subtract.z),
-            },
-            Self {
-                x: outside(&self.x, &subtract.x),
-                y: outside(&self.y, &subtract.y),
-                z: inside(&self.z, &subtract.z),
-            },
-            Self {
-                x: outside(&self.x, &subtract.x),
-                y: inside(&self.y, &subtract.y),
-                z: inside(&self.z, &subtract.z),
-            },
-            Self {
-                x: inside(&self.x, &subtract.x),
-                y: outside(&self.y, &subtract.y),
-                z: inside(&self.z, &subtract.z),
-            },
-        ];
-        let new_parts = vec![
-            Self {
-                x: outside(&subtract.x, &self.x),
-                y: outside(&subtract.y, &self.y),
-                z: outside(&subtract.z, &self.z),
-            },
-            Self {
-                x: outside(&subtract.x, &self.x),
-                y: inside(&subtract.y, &self.y),
-                z: outside(&subtract.z, &self.z),
-            },
-            Self {
-                x: inside(&subtract.x, &self.x),
-                y: outside(&subtract.y, &self.y),
-                z: outside(&subtract.z, &self.z),
-            },
-            Self {
-                x: outside(&subtract.x, &self.x),
-                y: outside(&subtract.y, &self.y),
-                z: inside(&subtract.z, &self.z),
-            },
-            Self {
-                x: outside(&subtract.x, &self.x),
-                y: inside(&subtract.y, &self.y),
-                z: inside(&subtract.z, &self.z),
-            },
-            Self {
-                x: inside(&subtract.x, &self.x),
-                y: outside(&subtract.y, &self.y),
-                z: inside(&subtract.z, &self.z),
-            },
-        ];
-
-        Some((
-            overlap,
-            orig_parts.into_iter().filter(|c| !c.is_empty()),
-            new_parts.into_iter().filter(|c| !c.is_empty()),
-        ))
     }
 
     fn is_empty(&self) -> bool {
         self.x.is_empty() || self.y.is_empty() || self.z.is_empty()
-    }
-}
-
-fn outside(a: &Range, b: &Range) -> Range {
-    if a.start() < b.start() {
-        *a.start()..=*b.start()
-    } else {
-        *b.end()..=*a.end()
-    }
-}
-
-fn inside(a: &Range, b: &Range) -> Range {
-    if a.start() < b.start() {
-        *b.start()..=*a.end()
-    } else {
-        *a.start()..=*b.end()
     }
 }
 
@@ -267,7 +160,7 @@ impl std::str::FromStr for Range3 {
                 let to = to.parse().map_err(|_| "couldn't parse number")?;
                 Ok(from..=to)
             } else {
-                panic!()
+                Err("couldn't split individual x/y/z range")
             }
         };
 
@@ -279,7 +172,7 @@ impl std::str::FromStr for Range3 {
                 z: parse_part(z)?,
             })
         } else {
-            panic!("3 parts?");
+            Err("expected 3 parts to range")
         }
     }
 }
@@ -292,111 +185,6 @@ mod test {
     fn test_part1_eg1() {
         let input = EG.parse().unwrap();
         assert_eq!(part1(&input), 39);
-    }
-
-    #[test]
-    fn test_ranges() {
-        let ref a = 2..=5;
-        let ref b = 4..=10;
-
-        assert_eq!(outside(a, b), 2..=4);
-        assert_eq!(inside(a, b), 4..=5);
-    }
-
-    #[test]
-    fn test_split_with() {
-        let a = Range3 {
-            x: 2..=5,
-            y: 2..=5,
-            z: 2..=5,
-        };
-        let b = Range3 {
-            x: 4..=10,
-            y: 4..=10,
-            z: 4..=10,
-        };
-
-        let (overlap, orig_parts, new_parts) = a.split_with(&b).unwrap();
-
-        assert_eq!(
-            overlap,
-            Range3 {
-                x: 4..=5,
-                y: 4..=5,
-                z: 4..=5,
-            }
-        );
-
-        assert_eq!(
-            orig_parts.collect::<Vec<_>>(),
-            vec![
-                Range3 {
-                    x: 2..=4,
-                    y: 2..=4,
-                    z: 2..=4,
-                },
-                Range3 {
-                    x: 2..=4,
-                    y: 4..=5,
-                    z: 2..=4,
-                },
-                Range3 {
-                    x: 4..=5,
-                    y: 2..=4,
-                    z: 2..=4,
-                },
-                Range3 {
-                    x: 2..=4,
-                    y: 2..=4,
-                    z: 4..=5,
-                },
-                Range3 {
-                    x: 2..=4,
-                    y: 4..=5,
-                    z: 4..=5,
-                },
-                Range3 {
-                    x: 4..=5,
-                    y: 2..=4,
-                    z: 4..=5,
-                },
-            ],
-        );
-        assert_eq!(
-            new_parts.collect::<Vec<_>>(),
-            vec![
-                Range3 {
-                    x: 5..=10,
-                    y: 5..=10,
-                    z: 5..=10,
-                },
-                Range3 {
-                    x: 5..=10,
-                    y: 4..=5,
-                    z: 5..=10,
-                },
-                Range3 {
-                    x: 4..=5,
-                    y: 5..=10,
-                    z: 5..=10,
-                },
-                Range3 {
-                    x: 5..=10,
-                    y: 5..=10,
-                    z: 4..=5,
-                },
-                Range3 {
-                    x: 5..=10,
-                    y: 4..=5,
-                    z: 4..=5,
-                },
-                Range3 {
-                    x: 4..=5,
-                    y: 5..=10,
-                    z: 4..=5,
-                },
-            ],
-        );
     }
 
     #[test]
